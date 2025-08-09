@@ -36,6 +36,8 @@ services:
       - ./tests:/app/tests:ro
       - ./config:/app/config:ro
       - ./src:/app/src:ro
+      - ./.coveragerc:/app/.coveragerc:ro
+      - ./coverage:/app/coverage
     profiles:
       - test
     networks:
