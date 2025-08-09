@@ -1,4 +1,4 @@
-FROM python:3.13.6-slim as base
+FROM python:3.13.6-slim AS base
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -26,7 +26,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 COPY pyproject.toml poetry.lock ./
 
-FROM base as production
+FROM base AS production
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/pypoetry \
@@ -48,7 +48,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 CMD ["python", "-m", "uvicorn", "src.controller.api.api:app", "--host", "0.0.0.0", "--port", "8080"]
 
-FROM base as test
+FROM base AS test
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/pypoetry \
