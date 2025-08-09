@@ -26,7 +26,7 @@ A PoC of an automatic bulk assignment grader LLM engine
    docker compose up --build auto-grade
    ```
 
-The API will be available at `http://localhost:8080`
+The API will be available at `http://localhost:8080/api` and the web interface at `http://localhost:8080`
 
 ## Development Commands
 
@@ -41,20 +41,20 @@ docker compose up --build -d auto-grade
 
 ### Testing
 ```bash
-# Run all tests (unit, integration, e2e)
-docker compose run --build --rm test
+# Run unit and integration tests
+docker compose --profile test run --build --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test
 
 # Run only unit tests
-docker compose run --build --rm test python -m pytest tests/unit/ -v
+docker compose --profile test run --build --rm test python -m pytest tests/unit/ -v
 
 # Run only integration tests
-docker compose run --build --rm test python -m pytest tests/integration/ -v
+docker compose --profile test run --build --rm test python -m pytest tests/integration/ -v
 
-# Run only e2e tests
-docker compose run --build --rm test python -m pytest tests/e2e/ -v
+# Run E2E tests
+docker compose --profile test run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test python -m pytest tests/e2e/ -v
 
 # Run tests with coverage report
-docker compose run --build --rm test python -m pytest tests/ -v --cov=src --cov=config
+docker compose --profile test run --build --rm test python -m pytest tests/unit/ tests/integration/ tests/e2e -v --cov=src --cov=config --cov-report=term
 ```
 
 ### Package Management
@@ -80,13 +80,19 @@ docker system prune -a
 
 ## Testing
 
-The project includes comprehensive testing:
+The project includes comprehensive testing with multiple layers:
 
-- **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test component interactions
-- **E2E Tests**: Test complete user workflows
+- **Unit Tests**: Test individual components in isolation (`tests/unit/`)
+- **Integration Tests**: Test component interactions (`tests/integration/`)
+- **E2E Tests**: Test complete user workflows using Playwright (`tests/e2e/`)
 
-Tests are automatically run in CI/CD pipeline on every push and pull request and a coverage badge is generated.
+### Test Architecture
+- Unit and integration tests run in a dedicated Docker container
+- E2E tests run in a separate Playwright container that communicates with the main application
+- All tests are automatically run in the CI/CD pipeline
+- Coverage reports are generated and uploaded to Codecov
+
+The testing setup ensures reliable validation across all application layers, from individual functions to complete user interactions.
 
 ## Contributing
 

@@ -51,3 +51,12 @@ ignore:
   - "**/*_test.py"
   - "setup.py"
   - "main.py"
+  - "static/**/*"
+  - "src/view/**/*"
+
+flags:
+  unittests:
+    paths:
+      - src/
+      - config/
+    carryforward: true

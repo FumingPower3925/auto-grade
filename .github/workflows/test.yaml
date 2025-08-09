@@ -126,7 +126,7 @@ jobs:
     
     - name: Test health endpoint
       run: |
-        curl -f http://localhost:8080/health || exit 1
+        curl -f http://localhost:8080/api/health || exit 1
         echo "Health check passed!"
     
     - name: View logs on failure
@@ -166,3 +166,69 @@ jobs:
         tags: auto-grade:${{ matrix.target }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create .env file
+      run: |
+        cp .env.example .env
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY || 'dummy_key_for_testing' }}" >> .env
+    
+    - name: Build images
+      run: |
+        docker compose build auto-grade
+        docker compose build test
+    
+    - name: Start application for E2E tests
+      run: |
+        docker compose up -d auto-grade
+        
+        # Wait for service to be ready
+        max_attempts=30
+        attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+          echo "E2E setup - Health check attempt $attempt/$max_attempts..."
+          
+          if ! docker compose ps | grep -q "auto-grade.*Up"; then
+            echo "Container is not running. Checking logs..."
+            docker compose logs auto-grade
+            exit 1
+          fi
+          
+          if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
+            echo "Service is ready for E2E tests!"
+            break
+          fi
+          
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Service did not become ready for E2E tests"
+            docker compose logs auto-grade
+            exit 1
+          fi
+          
+          sleep 3
+          attempt=$((attempt + 1))
+        done
+    
+    - name: Run E2E tests
+      run: |
+        docker compose run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test python -m pytest tests/e2e/ -v --browser chromium
+    
+    - name: View logs on E2E failure
+      if: failure()
+      run: |
+        docker compose logs auto-grade
+        docker compose ps
+    
+    - name: Stop services after E2E tests
+      if: always()
+      run: docker compose down
