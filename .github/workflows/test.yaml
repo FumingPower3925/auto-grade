@@ -158,7 +158,7 @@ jobs:
         echo "OPENAI_API_KEY=dummy_key" >> .env
     
     - name: Build Docker image - ${{ matrix.target }}
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         target: ${{ matrix.target }}
