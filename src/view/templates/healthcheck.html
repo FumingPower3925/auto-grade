@@ -1,0 +1,20 @@
+<button class="healthcheck" 
+        id="healthcheck-btn"
+        hx-get="/api/health"
+        hx-trigger="click"
+        hx-on::after-request="
+            if(event.detail.xhr.status === 200) {
+                this.innerHTML = '✓ Healthy';
+                htmx.addClass(this, 'success');
+            } else {
+                this.innerHTML = '✗ Error';
+                htmx.addClass(this, 'error');
+            }
+            setTimeout(() => {
+                this.innerHTML = 'Health Check';
+                htmx.removeClass(this, 'success');
+                htmx.removeClass(this, 'error');
+            }, 3000);
+        ">
+    Health Check
+</button>
