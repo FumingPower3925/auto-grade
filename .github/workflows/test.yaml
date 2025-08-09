@@ -13,6 +13,8 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
+      issues: write
+      checks: write
     
     steps:
     - name: Checkout code
@@ -36,10 +38,15 @@ jobs:
         docker compose run --rm test python -m pytest tests/ \
           --cov=src \
           --cov=config \
-          --cov-report=xml \
+          --cov-report=xml:/app/coverage/coverage.xml \
           --cov-report=term \
-          --cov-report=html \
+          --cov-report=html:/app/coverage/htmlcov \
           -v
+        
+        # Fix coverage paths for GitHub Actions
+        if [ -f coverage/coverage.xml ]; then
+          sed -i 's|/app/|./|g' coverage/coverage.xml
+        fi
     
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
@@ -59,15 +66,6 @@ jobs:
           coverage/coverage.xml
           coverage/htmlcov/
         retention-days: 30
-    
-    - name: Comment PR with coverage
-      if: github.event_name == 'pull_request'
-      uses: py-cov-action/python-coverage-comment-action@v3
-      with:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        COVERAGE_PATH: coverage/
-        MINIMUM_GREEN: 85
-        MINIMUM_ORANGE: 70
 
   integration-test:
     runs-on: ubuntu-latest
@@ -90,28 +88,52 @@ jobs:
     - name: Start services
       run: docker compose up -d auto-grade
     
-    - name: Wait for HTTP /health
+    - name: Wait for service to be ready
       run: |
-          for i in {1..60}; do
-          if curl -fsS http://localhost:8080/health >/dev/null; then
-              echo "Service is up"
-              exit 0
+        echo "Waiting for service to start..."
+        sleep 10
+        
+        max_attempts=30
+        attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+          echo "Health check attempt $attempt/$max_attempts..."
+          
+          # Check if container is running
+          if ! docker compose ps | grep -q "auto-grade.*Up"; then
+            echo "Container is not running. Checking logs..."
+            docker compose logs auto-grade
+            docker compose ps
+            exit 1
           fi
-          echo "Waiting... ($i/60)"
-          sleep 2
-          done
-          echo "Service did not become ready in time"
-          docker compose ps
-          docker compose logs
-          exit 1
+          
+          if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+            echo "Service is healthy!"
+            exit 0
+          fi
+          
+          echo "Service not ready yet, waiting..."
+          sleep 3
+          attempt=$((attempt + 1))
+        done
+        
+        echo "Service did not become ready in time"
+        echo "Container status:"
+        docker compose ps
+        echo "Container logs:"
+        docker compose logs auto-grade
+        exit 1
     
     - name: Test health endpoint
       run: |
         curl -f http://localhost:8080/health || exit 1
+        echo "Health check passed!"
     
     - name: View logs on failure
       if: failure()
-      run: docker compose logs
+      run: |
+        docker compose logs auto-grade
+        docker compose ps
     
     - name: Stop services
       if: always()

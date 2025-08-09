@@ -1,6 +1,6 @@
 [run]
 source = src,config
-data_file = coverage/.coverage
+data_file = /app/coverage/.coverage
 relative_files = True
 omit = 
     */tests/*
@@ -9,6 +9,8 @@ omit =
     */.venv/*
     */venv/*
     main.py
+    /usr/*
+    /app/venv/*
 
 [report]
 precision = 2
@@ -29,7 +31,14 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
 [html]
-directory = coverage/htmlcov
+directory = /app/coverage/htmlcov
 
 [xml]
-output = coverage/coverage.xml
+output = /app/coverage/coverage.xml
+
+[paths]
+source =
+    src/
+    /app/src/
+    config/
+    /app/config/
