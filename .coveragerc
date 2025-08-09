@@ -1,0 +1,44 @@
+[run]
+source = src,config
+data_file = /app/coverage/.coverage
+relative_files = True
+omit = 
+    */tests/*
+    */__init__.py
+    */test_*.py
+    */.venv/*
+    */venv/*
+    main.py
+    /usr/*
+    /app/venv/*
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+skip_empty = True
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+
+[html]
+directory = /app/coverage/htmlcov
+
+[xml]
+output = /app/coverage/coverage.xml
+
+[paths]
+source =
+    src/
+    /app/src/
+    config/
+    /app/config/

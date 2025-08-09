@@ -4,21 +4,25 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
+      cache_from:
+        - python:3.11-slim
     ports:
       - "8080:8080"
     environment:
       - PYTHONUNBUFFERED=1
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=8080
     env_file:
       - .env
     volumes:
       - ./config/config.toml:/app/config/config.toml:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - auto-grade-network
 
@@ -27,8 +31,11 @@ services:
       context: .
       dockerfile: Dockerfile
       target: test
+      cache_from:
+        - python:3.11-slim
     environment:
       - PYTHONUNBUFFERED=1
+      - COVERAGE_FILE=/app/coverage/.coverage
     env_file:
       - .env
     volumes:
@@ -36,6 +43,9 @@ services:
       - ./tests:/app/tests:ro
       - ./config:/app/config:ro
       - ./src:/app/src:ro
+      - ./.coveragerc:/app/.coveragerc:ro
+      - ./coverage:/app/coverage
+    working_dir: /app
     profiles:
       - test
     networks:

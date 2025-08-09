@@ -1,0 +1,168 @@
+name: Test and Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      issues: write
+      checks: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create .env file
+      run: |
+        cp .env.example .env
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY || 'dummy_key_for_testing' }}" >> .env
+    
+    - name: Build test image
+      run: docker compose build test
+    
+    - name: Run tests with coverage
+      run: |
+        mkdir -p coverage
+        chmod 777 coverage
+        docker compose run --rm test python -m pytest tests/ \
+          --cov=src \
+          --cov=config \
+          --cov-report=xml:/app/coverage/coverage.xml \
+          --cov-report=term \
+          --cov-report=html:/app/coverage/htmlcov \
+          -v
+        
+        # Fix coverage paths for GitHub Actions
+        if [ -f coverage/coverage.xml ]; then
+          sed -i 's|/app/|./|g' coverage/coverage.xml
+        fi
+    
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+    
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: |
+          coverage/coverage.xml
+          coverage/htmlcov/
+        retention-days: 30
+
+  integration-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create .env file
+      run: |
+        cp .env.example .env
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY || 'dummy_key_for_testing' }}" >> .env
+    
+    - name: Build production image
+      run: docker compose build auto-grade
+    
+    - name: Start services
+      run: docker compose up -d auto-grade
+    
+    - name: Wait for service to be ready
+      run: |
+        echo "Waiting for service to start..."
+        sleep 10
+        
+        max_attempts=30
+        attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+          echo "Health check attempt $attempt/$max_attempts..."
+          
+          # Check if container is running
+          if ! docker compose ps | grep -q "auto-grade.*Up"; then
+            echo "Container is not running. Checking logs..."
+            docker compose logs auto-grade
+            docker compose ps
+            exit 1
+          fi
+          
+          if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+            echo "Service is healthy!"
+            exit 0
+          fi
+          
+          echo "Service not ready yet, waiting..."
+          sleep 3
+          attempt=$((attempt + 1))
+        done
+        
+        echo "Service did not become ready in time"
+        echo "Container status:"
+        docker compose ps
+        echo "Container logs:"
+        docker compose logs auto-grade
+        exit 1
+    
+    - name: Test health endpoint
+      run: |
+        curl -f http://localhost:8080/health || exit 1
+        echo "Health check passed!"
+    
+    - name: View logs on failure
+      if: failure()
+      run: |
+        docker compose logs auto-grade
+        docker compose ps
+    
+    - name: Stop services
+      if: always()
+      run: docker compose down
+
+  docker-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [production, test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create .env file
+      run: |
+        cp .env.example .env
+        echo "OPENAI_API_KEY=dummy_key" >> .env
+    
+    - name: Build Docker image - ${{ matrix.target }}
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        target: ${{ matrix.target }}
+        push: false
+        tags: auto-grade:${{ matrix.target }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

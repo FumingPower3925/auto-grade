@@ -4,3 +4,13 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
