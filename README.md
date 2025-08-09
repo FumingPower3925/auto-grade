@@ -1,7 +1,7 @@
 # auto-grade
 
-[![Test and Coverage](https://github.com/FumingPower/auto-grade/actions/workflows/test.yml/badge.svg)](https://github.com/FumingPower/auto-grade/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/FumingPower/auto-grade/branch/main/graph/badge.svg?token=RID2DG7P0F)](https://codecov.io/gh/FumingPower/auto-grade)
+[![Test and Coverage](https://github.com/FumingPower/auto-grade/actions/workflows/test.yml/badge.svg)](https://github.com/FumingPower/auto-grade/actions/workflows/test.yaml)
+[![codecov](https://codecov.io/github/FumingPower3925/auto-grade/graph/badge.svg?token=RID2DG7P0F)](https://codecov.io/github/FumingPower3925/auto-grade)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker&logoColor=white)](https://www.docker.com/)
