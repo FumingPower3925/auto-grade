@@ -1,0 +1,7 @@
+[server]
+host = "localhost"
+port = 8080
+
+[llm]
+provider = "openai"
+model = "o4-mini"
