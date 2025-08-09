@@ -10,6 +10,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
     
     steps:
     - name: Checkout code
@@ -58,10 +61,11 @@ jobs:
         retention-days: 30
     
     - name: Comment PR with coverage
-      uses: py-cov-action/python-coverage-comment-action@v3
       if: github.event_name == 'pull_request'
+      uses: py-cov-action/python-coverage-comment-action@v3
       with:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COVERAGE_PATH: coverage/
         MINIMUM_GREEN: 85
         MINIMUM_ORANGE: 70
 
@@ -86,18 +90,20 @@ jobs:
     - name: Start services
       run: docker compose up -d auto-grade
     
-    - name: Wait for service to be healthy
+    - name: Wait for HTTP /health
       run: |
-        echo "Waiting for service to be healthy..."
-        for i in {1..30}; do
-          if docker compose ps | grep -q "healthy"; then
-            echo "Service is healthy"
-            break
+          for i in {1..60}; do
+          if curl -fsS http://localhost:8080/health >/dev/null; then
+              echo "Service is up"
+              exit 0
           fi
-          echo "Waiting... ($i/30)"
+          echo "Waiting... ($i/60)"
           sleep 2
-        done
-        docker compose ps
+          done
+          echo "Service did not become ready in time"
+          docker compose ps
+          docker compose logs
+          exit 1
     
     - name: Test health endpoint
       run: |

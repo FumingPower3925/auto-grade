@@ -1,6 +1,7 @@
 [run]
 source = src,config
 data_file = coverage/.coverage
+relative_files = True
 omit = 
     */tests/*
     */__init__.py
