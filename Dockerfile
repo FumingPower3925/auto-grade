@@ -1,4 +1,4 @@
-FROM python:3.13-slim as base
+FROM python:3.13.6-slim as base
 
 RUN apt-get update && apt-get install -y \
     curl \
