@@ -16,7 +16,8 @@ dependencies = [
     "uvicorn (>=0.35.0,<0.36.0)",
     "toml (>=0.10.2,<1.0.0)",
     "requests (>=2.31.0,<3.0.0)",
-    "httpx (>=0.28.1,<0.29.0)"
+    "httpx (>=0.28.1,<0.29.0)",
+    "jinja2 (>=3.1.6,<4.0.0)"
 ]
 
 [tool.poetry]
@@ -26,6 +27,9 @@ package-mode = false
 pytest = "^8.4.1"
 pytest-cov = "^6.0.0"
 httpx = "^0.28.1"
+mypy = "^1.13.0"
+playwright = "^1.48.0"
+pytest-playwright = "^0.6.2"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

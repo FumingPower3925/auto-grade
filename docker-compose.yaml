@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
       target: production
       cache_from:
-        - python:3.11-slim
+        - python:3.13.6-slim
     ports:
       - "8080:8080"
     environment:
@@ -18,7 +18,7 @@ services:
       - ./config/config.toml:/app/config/config.toml:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,7 +32,7 @@ services:
       dockerfile: Dockerfile
       target: test
       cache_from:
-        - python:3.11-slim
+        - python:3.13.6-slim
     environment:
       - PYTHONUNBUFFERED=1
       - COVERAGE_FILE=/app/coverage/.coverage
@@ -48,6 +48,9 @@ services:
     working_dir: /app
     profiles:
       - test
+    depends_on:
+      auto-grade:
+        condition: service_healthy
     networks:
       - auto-grade-network
 

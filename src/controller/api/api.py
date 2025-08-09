@@ -6,7 +6,8 @@ from src.controller.api.models import HealthResponse
 app = FastAPI(
     title="Auto Grade API",
     description="A PoC of an automatic bulk assignment grader LLM engine",
-    version="0.1.0"
+    version="0.1.0",
+    root_path="/api"
 )
 
 
