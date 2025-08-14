@@ -95,11 +95,31 @@ class TestFactories:
             assert client == mock_redis_client.return_value
 
     @patch('src.repository.db.factory.get_config')
-    def test_factory_unsupported_provider(self, mock_get_config: MagicMock) -> None:
-        """Test factory raises error for unsupported provider."""
+    def test_db_factory_unsupported_provider(self, mock_get_config: MagicMock) -> None:
+        """Test DB factory raises error for unsupported provider."""
         mock_config = MagicMock()
         mock_config.db.provider = "unsupported_db"
         mock_get_config.return_value = mock_config
 
         with pytest.raises(ValueError, match="Unsupported DB provider: unsupported_db"):
             get_db_client()
+
+    @patch('src.repository.vdb.factory.get_config')
+    def test_vdb_factory_unsupported_provider(self, mock_get_config: MagicMock) -> None:
+        """Test VDB factory raises error for unsupported provider."""
+        mock_config = MagicMock()
+        mock_config.vdb.provider = "unsupported_vdb"
+        mock_get_config.return_value = mock_config
+
+        with pytest.raises(ValueError, match="Unsupported VDB provider: unsupported_vdb"):
+            get_vdb_client()
+
+    @patch('src.repository.cache.factory.get_config')
+    def test_cache_factory_unsupported_provider(self, mock_get_config: MagicMock) -> None:
+        """Test Cache factory raises error for unsupported provider."""
+        mock_config = MagicMock()
+        mock_config.cache.provider = "unsupported_cache"
+        mock_get_config.return_value = mock_config
+
+        with pytest.raises(ValueError, match="Unsupported cache provider: unsupported_cache"):
+            get_cache_client()
