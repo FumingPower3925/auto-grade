@@ -5,3 +5,19 @@ port = 8080
 [llm]
 provider = "openai"
 model = "o4-mini"
+
+[redis]
+host = "redis"
+port = 6379
+
+[db]
+provider = "redis"
+db = 0
+
+[vdb]
+provider = "redis"
+db = 1
+
+[cache]
+provider = "redis"
+db = 2

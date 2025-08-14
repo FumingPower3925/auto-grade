@@ -2,17 +2,21 @@ import os
 from typing import Optional, Any
 from pydantic import BaseModel
 import toml
-from config.models import ServerConfig, LLMConfig
+from config.models import ServerConfig, LLMConfig, RedisConfig, DBConfig, VDBConfig, CacheConfig
 
 
 class Config(BaseModel):
     server: ServerConfig = ServerConfig()
     llm: LLMConfig = LLMConfig()
-    
+    redis: RedisConfig = RedisConfig()
+    db: DBConfig = DBConfig()
+    vdb: VDBConfig = VDBConfig()
+    cache: CacheConfig = CacheConfig()
+
     def __init__(self):
         toml_config = self._load_toml_config()
         super().__init__(**toml_config)
-    
+
     def _load_toml_config(self) -> dict[str, Any]:
         config_path = os.path.join(os.path.dirname(__file__), "config.toml")
         if os.path.exists(config_path):
@@ -23,18 +27,18 @@ class Config(BaseModel):
 class ConfigManager:
     """Singleton configuration manager."""
     _instance: Optional[Config] = None
-    
+
     @classmethod
     def get_config(cls) -> Config:
         if cls._instance is None:
             cls._instance = Config()
         return cls._instance
-    
+
     @classmethod
     def reload_config(cls) -> Config:
         cls._instance = None
         return cls.get_config()
-    
+
     @classmethod
     def reset(cls) -> None:
         cls._instance = None
