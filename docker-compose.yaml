@@ -25,6 +25,21 @@ services:
       start_period: 30s
     networks:
       - auto-grade-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:8.2-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auto-grade-network
 
   test:
     build:
@@ -50,6 +65,8 @@ services:
       - test
     depends_on:
       auto-grade:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - auto-grade-network
