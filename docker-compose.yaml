@@ -25,6 +25,27 @@ services:
       start_period: 30s
     networks:
       - auto-grade-network
+    depends_on:
+      ferretdb:
+        condition: service_healthy
+
+  ferretdb:
+    image: ghcr.io/ferretdb/all-in-one:latest
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - FERRETDB_TELEMETRY=disable
+    volumes:
+      - ferretdb-data:/state
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/debug/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - auto-grade-network
 
   test:
     build:
@@ -51,9 +72,14 @@ services:
     depends_on:
       auto-grade:
         condition: service_healthy
+      ferretdb:
+        condition: service_healthy
     networks:
       - auto-grade-network
 
 networks:
   auto-grade-network:
     driver: bridge
+
+volumes:
+  ferretdb-data:
