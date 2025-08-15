@@ -5,3 +5,9 @@ port = 8080
 [llm]
 provider = "openai"
 model = "o4-mini"
+
+[database]
+type = "ferretdb"
+host = "ferretdb"
+port = 27017
+name = "autograde"
