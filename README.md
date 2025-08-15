@@ -41,7 +41,7 @@ docker compose up --build -d auto-grade
 
 ### Testing
 ```bash
-# Run unit and integration tests
+# Run all tests
 docker compose --profile test run --build --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test
 
 # Run only unit tests
@@ -50,7 +50,7 @@ docker compose --profile test run --build --rm test python -m pytest tests/unit/
 # Run only integration tests
 docker compose --profile test run --build --rm test python -m pytest tests/integration/ -v
 
-# Run E2E tests
+# Run e2e tests
 docker compose --profile test run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test python -m pytest tests/e2e/ -v
 
 # Run tests with coverage report
