@@ -1,7 +1,6 @@
 import pytest
 import re
 import os
-from typing import Any
 from playwright.sync_api import Page, expect, Locator
 
 
