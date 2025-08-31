@@ -65,7 +65,7 @@ class TestWebE2E:
         expect(heading).to_have_text("Welcome to Auto Grade")
 
         # Check description
-        description: Locator = page.locator("p")
+        description: Locator = page.locator(".header-section p").first
         expect(description).to_contain_text("A PoC of an automatic bulk assignment grader LLM engine")
 
     def test_healthcheck_button_styling(self, page: Page) -> None:
