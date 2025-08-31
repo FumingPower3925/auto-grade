@@ -16,7 +16,7 @@ class AssignmentResponse(BaseModel):
     id: str
     name: str
     confidence_threshold: float
-    deliverables: List[str]
+    deliverables: List[str]  # List of deliverable IDs
     evaluation_rubrics_count: int
     relevant_documents_count: int
     created_at: str
@@ -47,7 +47,7 @@ class AssignmentDetailResponse(BaseModel):
     id: str
     name: str
     confidence_threshold: float
-    deliverables: List[str]
+    deliverables: List[str]  # List of deliverable IDs
     deliverables_count: int
     evaluation_rubrics: List[FileInfo]
     relevant_documents: List[FileInfo]
@@ -84,7 +84,7 @@ class DeliverableResponse(BaseModel):
     assignment_id: str
     student_name: str
     mark: Optional[float]
-    mark_status: str
+    mark_status: str  # "Marked" or "Unmarked"
     certainty_threshold: Optional[float]
     filename: str
     extension: str

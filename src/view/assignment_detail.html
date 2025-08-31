@@ -228,16 +228,19 @@
             </div>
         </div>
     </div>
+    
     <script>
         let currentUploadType = '';
         const assignmentId = '{{ assignment_id }}';
         let selectedDeliverableFiles = [];
         let currentDeleteDeliverableId = null;
         
+        // Load deliverables on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadDeliverables();
         });
         
+        // Load deliverables
         async function loadDeliverables() {
             try {
                 const response = await fetch(`/api/assignments/${assignmentId}/deliverables`);
@@ -299,6 +302,7 @@
             }
         }
         
+        // Deliverable upload modal functions
         function showDeliverableUploadModal() {
             document.getElementById('deliverableUploadModal').style.display = 'block';
             selectedDeliverableFiles = [];
@@ -312,12 +316,14 @@
             updateSelectedFilesList();
         }
         
+        // File selection
         document.getElementById('deliverableFileInput').addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
             selectedDeliverableFiles = files.filter(file => file.type === 'application/pdf');
             updateSelectedFilesList();
         });
         
+        // Drag and drop
         const uploadArea = document.getElementById('uploadArea');
         
         uploadArea.addEventListener('dragover', function(e) {
@@ -356,6 +362,7 @@
             }
         }
         
+        // Upload deliverables
         async function uploadDeliverables() {
             if (selectedDeliverableFiles.length === 0) return;
             
@@ -394,6 +401,7 @@
             }
         }
         
+        // Edit deliverable
         function editDeliverable(id, studentName, mark, certainty) {
             document.getElementById('editDeliverableId').value = id;
             document.getElementById('editStudentName').value = studentName;
@@ -442,6 +450,7 @@
             }
         });
         
+        // Delete deliverable
         function confirmDeleteDeliverable(id) {
             currentDeleteDeliverableId = id;
             document.getElementById('deleteConfirmModal').style.display = 'block';
@@ -471,6 +480,7 @@
             }
         });
         
+        // Original upload modal functions
         function showUploadModal(type) {
             currentUploadType = type;
             const modal = document.getElementById('uploadModal');
@@ -519,6 +529,7 @@
             }
         });
         
+        // Modal close on outside click
         window.onclick = function(event) {
             if (event.target.className === 'modal') {
                 if (event.target.id === 'uploadModal') hideUploadModal();

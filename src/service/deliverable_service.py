@@ -28,8 +28,10 @@ class DeliverableService:
             return ("Unknown", None)
         
         try:
+            # Convert PDF content to base64 for OpenAI Vision API
             base64_pdf = base64.b64encode(pdf_content).decode('utf-8')
             
+            # Use OpenAI's GPT-4 Vision to extract text and find student name
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.openai_api_key}"
@@ -68,9 +70,10 @@ class DeliverableService:
                 result = response.json()
                 student_name = result.get("choices", [{}])[0].get("message", {}).get("content", "Unknown").strip()
                 
+                # Clean up the extracted name
                 student_name = self._clean_student_name(student_name)
                 
-                return (student_name, None)
+                return (student_name, None)  # Could return extracted text if needed
             else:
                 return ("Unknown", None)
                 
@@ -89,16 +92,20 @@ class DeliverableService:
         if not name or name.lower() in ["unknown", "not found", "n/a", "none"]:
             return "Unknown"
         
+        # Remove common prefixes
         prefixes_to_remove = ["Name:", "Student:", "Author:", "Submitted by:", "By:"]
         for prefix in prefixes_to_remove:
             if name.startswith(prefix):
                 name = name[len(prefix):].strip()
         
+        # Remove special characters but keep spaces and hyphens
         name = re.sub(r'[^a-zA-Z0-9\s\-\']', '', name).strip()
         
+        # Validate the name (should have at least one letter)
         if not re.search(r'[a-zA-Z]', name):
             return "Unknown"
         
+        # Limit length
         if len(name) > 100:
             name = name[:100]
         
@@ -120,16 +127,19 @@ class DeliverableService:
         Returns:
             The ID of the uploaded deliverable.
         """
+        # Check if assignment exists
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
         
+        # Extract student name if requested and file is PDF
         student_name = "Unknown"
         extracted_text = None
         
         if extract_name and extension.lower() == "pdf":
             student_name, extracted_text = self.extract_student_name_from_pdf(content)
         
+        # Store the deliverable
         return self.db_repository.store_deliverable(
             assignment_id=assignment_id,
             filename=filename,
@@ -153,6 +163,7 @@ class DeliverableService:
         Returns:
             List of IDs of the uploaded deliverables.
         """
+        # Check if assignment exists
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
@@ -171,6 +182,7 @@ class DeliverableService:
                 )
                 deliverable_ids.append(deliverable_id)
             except Exception:
+                # Log error but continue with other files
                 continue
         
         return deliverable_ids
@@ -258,6 +270,7 @@ class DeliverableService:
         Returns:
             A tuple of (is_valid, error_message).
         """
+        # Currently only support PDF
         supported_extensions = [".pdf"]
         supported_mime_types = ["application/pdf"]
         

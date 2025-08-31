@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, status, Form
 from fastapi.responses import StreamingResponse
-from typing import List
+from typing import List, Optional
 import io
 import datetime as datetime
 from src.controller.api.models import (
@@ -150,7 +150,7 @@ async def get_assignment(assignment_id: str) -> AssignmentDetailResponse:
             id=str(assignment.id),
             name=assignment.name,
             confidence_threshold=assignment.confidence_threshold,
-            deliverables=assignment.deliverables, # type: ignore
+            deliverables=assignment.deliverables,  # type: ignore
             deliverables_count=len(assignment.deliverables),
             evaluation_rubrics=rubric_infos,
             relevant_documents=document_infos,
@@ -259,6 +259,7 @@ async def download_file(file_id: str):
         raise HTTPException(status_code=500, detail="Failed to download file")
 
 
+# Deliverable endpoints
 @app.post("/assignments/{assignment_id}/deliverables", response_model=DeliverableUploadResponse, tags=["Deliverables"])
 async def upload_deliverable(
     assignment_id: str,
@@ -269,6 +270,7 @@ async def upload_deliverable(
     deliverable_service = DeliverableService()
     
     try:
+        # Validate file format
         if not file.filename:
             raise HTTPException(status_code=422, detail="Filename is required")
         
@@ -323,11 +325,12 @@ async def upload_multiple_deliverables(
         uploaded_deliverables: List[DeliverableUploadResponse] = []
         files_data: List[tuple[str, bytes, str, str]] = []
         
+        # Validate all files first
         for file in files:
             if not file.filename:
                 continue
             
-            is_valid = deliverable_service.validate_file_format(
+            is_valid, error_msg = deliverable_service.validate_file_format(
                 file.filename,
                 file.content_type or "application/octet-stream"
             )
@@ -346,12 +349,14 @@ async def upload_multiple_deliverables(
         if not files_data:
             raise HTTPException(status_code=422, detail="No valid files provided")
         
+        # Upload all valid files
         deliverable_ids = deliverable_service.upload_multiple_deliverables(
             assignment_id=assignment_id,
             files=files_data,
             extract_names=extract_names
         )
         
+        # Get details of uploaded deliverables
         for deliverable_id in deliverable_ids:
             deliverable = deliverable_service.get_deliverable(deliverable_id)
             if deliverable:

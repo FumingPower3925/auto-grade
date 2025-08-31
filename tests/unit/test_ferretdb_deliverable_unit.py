@@ -41,6 +41,7 @@ class TestFerretDBDeliverableRepository:
         
         assert result == str(deliverable_id)
         
+        # Verify deliverable was stored
         call_args = mock_deliverables_collection.insert_one.call_args[0][0]
         assert call_args["assignment_id"] == assignment_id
         assert call_args["filename"] == "submission.pdf"
@@ -52,6 +53,7 @@ class TestFerretDBDeliverableRepository:
         assert call_args["mark"] is None
         assert call_args["certainty_threshold"] is None
         
+        # Verify assignment was updated
         mock_assignments_collection.update_one.assert_called_once()
         update_call = mock_assignments_collection.update_one.call_args[0]
         assert update_call[0] == {"_id": assignment_id}
@@ -203,11 +205,13 @@ class TestFerretDBDeliverableRepository:
         mock_deliverables_collection = MagicMock()
         mock_assignments_collection = MagicMock()
         
+        # Mock finding the deliverable
         mock_deliverables_collection.find_one.return_value = {
             "_id": deliverable_id,
             "assignment_id": assignment_id
         }
         
+        # Mock deletion
         mock_delete_result = MagicMock()
         mock_delete_result.deleted_count = 1
         mock_deliverables_collection.delete_one.return_value = mock_delete_result
@@ -220,14 +224,17 @@ class TestFerretDBDeliverableRepository:
         
         assert result is True
         
+        # Verify deliverable was found
         mock_deliverables_collection.find_one.assert_called_once_with({"_id": deliverable_id})
         
+        # Verify assignment was updated
         mock_assignments_collection.update_one.assert_called_once()
         update_call = mock_assignments_collection.update_one.call_args[0]
         assert update_call[0] == {"_id": assignment_id}
         assert "$pull" in update_call[1]
         assert update_call[1]["$pull"]["deliverables"] == deliverable_id
         
+        # Verify deliverable was deleted
         mock_deliverables_collection.delete_one.assert_called_once_with({"_id": deliverable_id})
 
     @patch('src.repository.db.ferretdb.repository.MongoClient')
@@ -237,6 +244,7 @@ class TestFerretDBDeliverableRepository:
         mock_deliverables_collection = MagicMock()
         mock_assignments_collection = MagicMock()
         
+        # Mock not finding the deliverable
         mock_deliverables_collection.find_one.return_value = None
         
         repo = FerretDBRepository()
