@@ -1,3 +1,5 @@
+x-base-image: &base-image quay.io/lib/python:3.13.7-slim
+
 services:
   auto-grade:
     build:
@@ -5,7 +7,7 @@ services:
       dockerfile: Dockerfile
       target: production
       cache_from:
-        - python:3.13.6-slim
+        - *base-image
     ports:
       - "8080:8080"
     environment:
@@ -53,7 +55,7 @@ services:
       dockerfile: Dockerfile
       target: test
       cache_from:
-        - python:3.13.6-slim
+        - *base-image
     environment:
       - PYTHONUNBUFFERED=1
       - COVERAGE_FILE=/app/coverage/.coverage

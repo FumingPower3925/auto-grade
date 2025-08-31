@@ -1,4 +1,5 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
+from datetime import datetime, timezone
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection
@@ -6,7 +7,7 @@ from pymongo.errors import ConnectionFailure
 from bson import ObjectId
 from config.config import get_config
 from src.repository.db.base import DatabaseRepository
-from src.repository.db.models import DocumentModel
+from src.repository.db.models import DocumentModel, AssignmentModel, FileModel
 
 
 class FerretDBRepository(DatabaseRepository):
@@ -16,6 +17,8 @@ class FerretDBRepository(DatabaseRepository):
         self.client: MongoClient[Dict[str, Any]] = MongoClient(host=config.host, port=config.port)
         self.db: Database[Dict[str, Any]] = self.client[config.name]
         self.collection: Collection[Dict[str, Any]] = self.db["grades"]
+        self.assignments_collection: Collection[Dict[str, Any]] = self.db["assignments"]
+        self.files_collection: Collection[Dict[str, Any]] = self.db["files"]
 
     def health(self) -> bool:
         try:
@@ -44,3 +47,117 @@ class FerretDBRepository(DatabaseRepository):
             return None
         except Exception:
             return None
+
+    def create_assignment(self, name: str, confidence_threshold: float) -> str:
+        assignment_data: Dict[str, Any] = {
+            "name": name,
+            "confidence_threshold": confidence_threshold,
+            "deliverables": [],
+            "evaluation_rubrics": [],
+            "relevant_documents": [],
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+        }
+        result = self.assignments_collection.insert_one(assignment_data)
+        return str(result.inserted_id)
+
+    def get_assignment(self, assignment_id: str) -> Optional[AssignmentModel]:
+        try:
+            obj_id = ObjectId(assignment_id)
+            assignment = self.assignments_collection.find_one({"_id": obj_id})
+            if assignment:
+                return AssignmentModel.model_validate(assignment)
+            return None
+        except Exception:
+            return None
+
+    def list_assignments(self) -> List[AssignmentModel]:
+        assignments: List[AssignmentModel] = []
+        for doc in self.assignments_collection.find().sort("created_at", -1):
+            try:
+                assignments.append(AssignmentModel.model_validate(doc))
+            except Exception:
+                continue
+        return assignments
+
+    def delete_assignment(self, assignment_id: str) -> bool:
+        try:
+            obj_id = ObjectId(assignment_id)
+            
+            self.files_collection.delete_many({"assignment_id": obj_id})
+            
+            result = self.assignments_collection.delete_one({"_id": obj_id})
+            return result.deleted_count > 0
+        except Exception:
+            return False
+
+    def update_assignment(self, assignment_id: str, **kwargs: Any) -> bool:
+        try:
+            obj_id = ObjectId(assignment_id)
+            
+            kwargs["updated_at"] = datetime.now(timezone.utc)
+
+            result = self.assignments_collection.update_one(
+                {"_id": obj_id},
+                {"$set": kwargs}
+            )
+            return result.modified_count > 0
+        except Exception:
+            return False
+
+    def store_file(self, assignment_id: str, filename: str, content: bytes, 
+                   content_type: str, file_type: str) -> str:
+        try:
+            obj_id = ObjectId(assignment_id)
+            file_data: Dict[str, Any] = {
+                "assignment_id": obj_id,
+                "filename": filename,
+                "content": content,
+                "content_type": content_type,
+                "file_type": file_type,
+                "uploaded_at": datetime.now(timezone.utc),
+            }
+            result = self.files_collection.insert_one(file_data)
+            file_id = str(result.inserted_id)
+            
+            if file_type == "rubric":
+                self.assignments_collection.update_one(
+                    {"_id": obj_id},
+                    {"$push": {"evaluation_rubrics": result.inserted_id}}
+                )
+            elif file_type == "relevant_document":
+                self.assignments_collection.update_one(
+                    {"_id": obj_id},
+                    {"$push": {"relevant_documents": result.inserted_id}}
+                )
+            
+            return file_id
+        except Exception:
+            raise
+
+    def get_file(self, file_id: str) -> Optional[FileModel]:
+        try:
+            obj_id = ObjectId(file_id)
+            file_doc = self.files_collection.find_one({"_id": obj_id})
+            if file_doc:
+                return FileModel.model_validate(file_doc)
+            return None
+        except Exception:
+            return None
+
+    def list_files_by_assignment(self, assignment_id: str, file_type: Optional[str] = None) -> List[FileModel]:
+        try:
+            obj_id = ObjectId(assignment_id)
+            query: Dict[str, Any] = {"assignment_id": obj_id}
+            if file_type:
+                query["file_type"] = file_type
+            
+            files: List[FileModel] = []
+            for doc in self.files_collection.find(query).sort("uploaded_at", -1):
+                try:
+                    files.append(FileModel.model_validate(doc))
+                except Exception:
+                    continue
+            return files
+        except Exception:
+            return []
