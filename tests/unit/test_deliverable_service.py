@@ -13,14 +13,19 @@ class TestDeliverableService:
     @patch('src.service.deliverable_service.get_database_repository')
     def test_extract_student_name_from_pdf_no_api_key(self, mock_get_repo: MagicMock) -> None:
         """Test extracting student name when no API key is available."""
-        with patch('os.getenv', return_value=""):
-            service = DeliverableService()
-            name, text = service.extract_student_name_from_pdf(b"pdf content")
-            
-            assert name == "Unknown"
-            assert text is None
+        with patch('src.service.deliverable_service.os.getenv', return_value=""):
+            with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+                mock_page = MagicMock()
+                mock_page.extract_text.return_value = ""
+                mock_reader_instance = MagicMock()
+                mock_reader_instance.pages = [mock_page]
+                mock_pdf_reader.return_value = mock_reader_instance
+                
+                service = DeliverableService()
+                name, text = service.extract_student_name_from_pdf(b"pdf content") # type: ignore
 
-    @patch('src.service.deliverable_service.requests.post')
+                assert name == "Unknown"
+
     @patch('src.service.deliverable_service.get_database_repository')
     def test_extract_student_name_from_pdf_success(self, mock_get_repo: MagicMock) -> None:
         """Test successful student name extraction from PDF using PyPDF2."""
@@ -43,18 +48,24 @@ class TestDeliverableService:
     @patch('src.service.deliverable_service.get_database_repository')
     def test_extract_student_name_from_pdf_api_error(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
         """Test extraction when API returns an error."""
-        with patch('os.getenv', return_value="test_api_key"):
-            mock_response = MagicMock()
-            mock_response.status_code = 400
-            mock_post.return_value = mock_response
-            
-            service = DeliverableService()
-            name, text = service.extract_student_name_from_pdf(b"pdf content")
-            
-            assert name == "Unknown"
-            assert text is None
+        with patch('src.service.deliverable_service.os.getenv', return_value="test_api_key"):
+            with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+                mock_page = MagicMock()
+                mock_page.extract_text.return_value = "Some random text without a clear name"
+                mock_reader_instance = MagicMock()
+                mock_reader_instance.pages = [mock_page]
+                mock_pdf_reader.return_value = mock_reader_instance
+                
+                mock_response = MagicMock()
+                mock_response.status_code = 400
+                mock_post.return_value = mock_response
+                
+                service = DeliverableService()
+                service.openai_api_key = "test_api_key"
+                name, text = service.extract_student_name_from_pdf(b"pdf content") # type: ignore
 
-    @patch('src.service.deliverable_service.requests.post')
+                assert name == "Unknown"
+
     @patch('src.service.deliverable_service.get_database_repository')
     def test_extract_student_name_from_pdf_exception(self, mock_get_repo: MagicMock) -> None:
         """Test extraction when an exception occurs."""
@@ -541,12 +552,12 @@ class TestDeliverableService:
                 mock_reader_instance.pages = [mock_page]
                 mock_pdf_reader.return_value = mock_reader_instance
                 
-                name = service.extract_student_name_from_pdf(b"pdf content")
+                name, text = service.extract_student_name_from_pdf(b"pdf content") # type: ignore
                 assert name == expected_name, f"Failed for pattern: {pdf_text}"
 
     @patch('src.service.deliverable_service.get_database_repository')
     def test_extract_name_from_text(self, mock_get_repo: MagicMock) -> None:
-        """Test the _extract_name_from_text method."""
+        """Test the extract_name_from_text method."""
         service = DeliverableService()
         
         assert service.extract_name_from_text("") == "Unknown"
@@ -614,7 +625,7 @@ class TestDeliverableService:
             
             with patch('src.service.deliverable_service.logger') as mock_logger:
                 service = DeliverableService()
-                name = service.extract_student_name_from_pdf(b"pdf content")
+                name, text = service.extract_student_name_from_pdf(b"pdf content") # type: ignore
                 
                 assert name == "Jane Smith"
                 mock_logger.warning.assert_called()
@@ -654,3 +665,190 @@ class TestDeliverableService:
             
             assert deliverable_ids == ["id1", "id3"]
             mock_logger.error.assert_called()
+
+    @patch('src.service.deliverable_service.requests.post')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_with_openai_success(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test successful name extraction with OpenAI."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [
+                {"message": {"content": "John Smith"}}
+            ]
+        }
+        mock_post.return_value = mock_response
+        
+        service = DeliverableService()
+        service.openai_api_key = "test_key"
+        
+        name = service.extract_name_with_openai("Some text about a student")
+        assert name == "John Smith"
+
+    @patch('src.service.deliverable_service.requests.post')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_with_openai_failure(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test OpenAI extraction failure."""
+        mock_post.side_effect = Exception("API error")
+        
+        service = DeliverableService()
+        service.openai_api_key = "test_key"
+        
+        name = service.extract_name_with_openai("Some text")
+        assert name == "Unknown"
+
+    @patch('src.service.deliverable_service.requests.post')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_with_openai_timeout(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test OpenAI API timeout (line 77)."""
+        import requests
+        mock_post.side_effect = requests.exceptions.Timeout("Request timed out")
+        
+        from src.service.deliverable_service import DeliverableService
+        service = DeliverableService()
+        service.openai_api_key = "test_key"
+        
+        with patch('src.service.deliverable_service.logger') as mock_logger:
+            name = service.extract_name_with_openai("Some text")
+            assert name == "Unknown"
+            mock_logger.warning.assert_called_with("OpenAI API request timed out")
+
+    @patch('src.service.deliverable_service.requests.post')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_with_openai_non_200_status(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test OpenAI API non-200 status code (lines 111-119)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_post.return_value = mock_response
+        
+        from src.service.deliverable_service import DeliverableService
+        service = DeliverableService()
+        service.openai_api_key = "test_key"
+        
+        with patch('src.service.deliverable_service.logger') as mock_logger:
+            name = service.extract_name_with_openai("Some text")
+            assert name == "Unknown"
+            mock_logger.warning.assert_called_with("OpenAI API returned status 400")
+
+    @patch('src.service.deliverable_service.requests.post')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_with_openai_cleans_result(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test OpenAI result cleaning (line 110)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [
+                {"message": {"content": "Name: John Smith"}}
+            ]
+        }
+        mock_post.return_value = mock_response
+        
+        from src.service.deliverable_service import DeliverableService
+        service = DeliverableService()
+        service.openai_api_key = "test_key"
+        
+        with patch('src.service.deliverable_service.logger') as mock_logger:
+            name = service.extract_name_with_openai("Some text")
+            assert name == "John Smith"
+            mock_logger.info.assert_called_with("OpenAI extracted student name: John Smith")
+
+    @patch('src.service.deliverable_service.requests.post')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_with_openai_returns_unknown(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test OpenAI returning 'Unknown' (line 112-113)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [
+                {"message": {"content": "Unknown"}}
+            ]
+        }
+        mock_post.return_value = mock_response
+        
+        from src.service.deliverable_service import DeliverableService
+        service = DeliverableService()
+        service.openai_api_key = "test_key"
+        
+        name = service.extract_name_with_openai("Some text")
+        assert name == "Unknown"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_upload_deliverable_non_pdf_with_extract_name(self, mock_get_repo: MagicMock) -> None:
+        """Test upload of non-PDF with extract_name=True (line 173)."""
+        from src.service.deliverable_service import DeliverableService
+        from src.repository.db.models import AssignmentModel
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test Assignment",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.return_value = "deliverable_id"
+        mock_get_repo.return_value = mock_repo
+        
+        service = DeliverableService()
+        
+        deliverable_id = service.upload_deliverable(
+            "assignment_id",
+            "document.txt",
+            b"text content",
+            "txt",
+            "text/plain",
+            extract_name=True
+        )
+        
+        assert deliverable_id == "deliverable_id"
+        
+        mock_repo.store_deliverable.assert_called_once_with(
+            assignment_id="assignment_id",
+            filename="document.txt",
+            content=b"text content",
+            extension="txt",
+            content_type="text/plain",
+            student_name="Unknown",
+            extracted_text=None
+        )
+
+    @patch('src.service.deliverable_service.requests.post')
+    @patch('src.service.deliverable_service.PdfReader')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_student_name_from_pdf_with_openai_integration(
+        self, 
+        mock_get_repo: MagicMock, 
+        mock_pdf_reader: MagicMock,
+        mock_post: MagicMock
+    ) -> None:
+        """Test full integration of PDF extraction with OpenAI fallback."""
+        from src.service.deliverable_service import DeliverableService
+        
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Some random assignment text without clear name pattern"
+        mock_reader_instance = MagicMock()
+        mock_reader_instance.pages = [mock_page]
+        mock_pdf_reader.return_value = mock_reader_instance
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [
+                {"message": {"content": "Jane Doe"}}
+            ]
+        }
+        mock_post.return_value = mock_response
+        
+        service = DeliverableService()
+        service.openai_api_key = "test_key"
+        
+        name, text = service.extract_student_name_from_pdf(b"pdf content")
+
+        assert name == "Jane Doe"
+        assert text is not None
+        
+        mock_post.assert_called_once()

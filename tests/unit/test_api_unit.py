@@ -3,6 +3,7 @@ from fastapi import status
 from typing import Dict, Any
 from httpx import Response
 from unittest.mock import patch, MagicMock
+import io
 
 from src.controller.api.api import app
 from src.controller.api.models import HealthResponse
@@ -33,7 +34,6 @@ class TestHealthEndpoint:
         response: Response = self.client.get("/health")
         data: Dict[str, Any] = response.json()
 
-        # Validate response structure
         assert "status" in data
         assert "message" in data
         assert isinstance(data["status"], str)
@@ -63,7 +63,6 @@ class TestHealthEndpoint:
         response: Response = self.client.get("/health")
         data: Dict[str, Any] = response.json()
 
-        # This should not raise a validation error
         health_response = HealthResponse(**data)
         assert health_response.status == "healthy"
         assert health_response.message == "Auto Grade API is running and connected to the database"
@@ -259,3 +258,98 @@ class TestAPIRouteConfiguration:
         )
         assert response.status_code == 404
         assert response.json()["detail"] == "Assignment not found"
+
+    @patch('src.controller.api.api.AssignmentService')
+    def test_create_assignment_retrieval_failure_after_creation(self, mock_service_class: MagicMock) -> None:
+        """Test when assignment retrieval fails after creation (line 73)."""
+        mock_service = MagicMock()
+        mock_service.create_assignment.return_value = "assignment_id"
+        mock_service.get_assignment.return_value = None
+        mock_service_class.return_value = mock_service
+        
+        response: Response = self.client.post(
+            "/assignments",
+            json={"name": "Test", "confidence_threshold": 0.5}
+        )
+        
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to retrieve created assignment" in response.json()["detail"]
+
+    @patch('src.controller.api.api.AssignmentService')
+    def test_create_assignment_general_exception(self, mock_service_class: MagicMock) -> None:
+        """Test general exception during assignment creation (line 96)."""
+        mock_service = MagicMock()
+        mock_service.create_assignment.side_effect = RuntimeError("Unexpected error")
+        mock_service_class.return_value = mock_service
+        
+        response: Response = self.client.post(
+            "/assignments",
+            json={"name": "Test", "confidence_threshold": 0.5}
+        )
+        
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to create assignment" in response.json()["detail"]
+
+    @patch('src.controller.api.api.DeliverableService')
+    def test_upload_deliverable_retrieval_failure(self, mock_service_class: MagicMock) -> None:
+        """Test when deliverable retrieval fails after upload (line 328)."""
+        mock_service = MagicMock()
+        mock_service.validate_file_format.return_value = (True, "")
+        mock_service.upload_deliverable.return_value = "deliverable_id"
+        mock_service.get_deliverable.return_value = None
+        mock_service_class.return_value = mock_service
+        
+        response: Response = self.client.post(
+            "/assignments/assignment_id/deliverables",
+            files={"file": ("test.pdf", io.BytesIO(b"content"), "application/pdf")},
+            data={"extract_name": "false"}
+        )
+        
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to retrieve uploaded deliverable" in response.json()["detail"]
+
+    @patch('src.controller.api.api.DeliverableService')
+    def test_update_deliverable_retrieval_failure(self, mock_service_class: MagicMock) -> None:
+        """Test when deliverable retrieval fails after update (line 434)."""
+        mock_service = MagicMock()
+        mock_service.update_deliverable.return_value = True
+        mock_service.get_deliverable.return_value = None
+        mock_service_class.return_value = mock_service
+        
+        response: Response = self.client.patch(
+            "/deliverables/deliverable_id",
+            json={"student_name": "Test"}
+        )
+        
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to retrieve updated deliverable" in response.json()["detail"]
+
+    @patch('src.controller.api.api.AssignmentService')
+    def test_upload_rubric_general_exception(self, mock_service_class: MagicMock) -> None:
+        """Test general exception during rubric upload (lines 273)."""
+        mock_service = MagicMock()
+        mock_service.upload_rubric.side_effect = RuntimeError("Unexpected error")
+        mock_service_class.return_value = mock_service
+        
+        response: Response = self.client.post(
+            "/assignments/assignment_id/rubrics",
+            files={"file": ("rubric.pdf", io.BytesIO(b"content"), "application/pdf")}
+        )
+        
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to upload rubric" in response.json()["detail"]
+
+    @patch('src.controller.api.api.AssignmentService')
+    def test_upload_document_general_exception(self, mock_service_class: MagicMock) -> None:
+        """Test general exception during document upload (line 296)."""
+        mock_service = MagicMock()
+        mock_service.upload_relevant_document.side_effect = RuntimeError("Unexpected error")
+        mock_service_class.return_value = mock_service
+        
+        response: Response = self.client.post(
+            "/assignments/assignment_id/documents",
+            files={"file": ("doc.pdf", io.BytesIO(b"content"), "application/pdf")}
+        )
+        
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert "Failed to upload document" in response.json()["detail"]

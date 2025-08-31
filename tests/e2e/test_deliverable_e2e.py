@@ -10,22 +10,23 @@ class TestDeliverableE2E:
     @pytest.fixture(autouse=True)
     def setup_page(self, page: Page) -> None:
         """Setup page navigation before each test."""
-        # Get base URL from environment or use default
         self.base_url = os.getenv("PLAYWRIGHT_BASE_URL", "http://auto-grade:8080")
         page.goto(self.base_url)
         
-        # Create a test assignment for deliverable tests
         self.assignment_id = self._create_test_assignment(page)
+        self.page = page
 
-    def teardown_method(self, page: Page) -> None:
+    def teardown_method(self, method) -> None: # type: ignore
         """Clean up test data after each test."""
-        if hasattr(self, 'assignment_id') and self.assignment_id:
-            # Delete the test assignment (which will also delete deliverables)
-            page.evaluate(f"""
-                fetch('/api/assignments/{self.assignment_id}', {{
-                    method: 'DELETE'
-                }})
-            """)
+        if hasattr(self, 'assignment_id') and self.assignment_id and hasattr(self, 'page'):
+            try:
+                self.page.evaluate(f"""
+                    fetch('/api/assignments/{self.assignment_id}', {{
+                        method: 'DELETE'
+                    }})
+                """)
+            except Exception:
+                pass
 
     def _create_test_assignment(self, page: Page) -> str:
         """Create a test assignment and return its ID."""
