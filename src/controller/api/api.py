@@ -326,8 +326,8 @@ async def upload_multiple_deliverables(
         for file in files:
             if not file.filename:
                 continue
-            
-            is_valid = deliverable_service.validate_file_format(
+
+            is_valid, error_msg = deliverable_service.validate_file_format( # type: ignore
                 file.filename,
                 file.content_type or "application/octet-stream"
             )

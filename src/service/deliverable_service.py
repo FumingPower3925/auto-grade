@@ -1,11 +1,12 @@
 import os
 import re
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 from src.repository.db.factory import get_database_repository
 from src.repository.db.models import DeliverableModel
 import io
 from pypdf import PdfReader
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class DeliverableService:
 
     def __init__(self) -> None:
         self.db_repository = get_database_repository()
+        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
     def extract_student_name_from_pdf(self, pdf_content: bytes) -> Tuple[str, Optional[str]]:
         """Extract student name from PDF content using PyPDF2.
@@ -44,11 +46,69 @@ class DeliverableService:
             
             student_name = self.extract_name_from_text(extracted_text)
             
+            if student_name == "Unknown" and self.openai_api_key and extracted_text:
+                student_name = self.extract_name_with_openai(extracted_text[:2000])
+
             return (student_name, extracted_text[:5000] if extracted_text else None)
             
         except Exception as e:
             logger.error(f"Failed to extract text from PDF: {e}")
             return ("Unknown", None)
+
+    def extract_name_with_openai(self, text: str) -> str:
+        """Extract student name using OpenAI API.
+        
+        Args:
+            text: The extracted text from the PDF.
+            
+        Returns:
+            The extracted student name or "Unknown".
+        """
+        try:
+            url = "https://api.openai.com/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.openai_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            prompt = (
+                "Extract the student's full name from the following text. "
+                "If you can identify a student name, return ONLY the name. "
+                "If no student name can be found, return 'Unknown'. "
+                "Do not include titles, prefixes like 'Name:', or any other text.\n\n"
+                f"Text:\n{text}"
+            )
+            
+            data: Dict[str, Any] = {
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant that extracts student names from documents."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0,
+                "max_tokens": 50
+            }
+            
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                name = result["choices"][0]["message"]["content"].strip()
+                
+                cleaned_name = self.clean_student_name(name)
+                
+                if cleaned_name != "Unknown":
+                    logger.info(f"OpenAI extracted student name: {cleaned_name}")
+                    return cleaned_name
+            else:
+                logger.warning(f"OpenAI API returned status {response.status_code}")
+                
+        except requests.exceptions.Timeout:
+            logger.warning("OpenAI API request timed out")
+        except Exception as e:
+            logger.error(f"Failed to extract name with OpenAI: {e}")
+        
+        return "Unknown"
 
     def clean_student_name(self, name: str) -> str:
         """Clean and validate the extracted student name.
@@ -94,14 +154,14 @@ class DeliverableService:
             return "Unknown"
         
         patterns = [
-            r'(?:Name|Student|Author|Submitted by|By|Student Name)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)',
-            r'^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)\s*\n',
-            r'([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)\s*\n.*(?:Assignment|Homework|Project)',
-            r'(?:Prepared by|Written by|Created by)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)',
+            r'(?:Name|Student|Author|Submitted by|By|Student Name)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})',
+            r'^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})$',
+            r'^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})\s*\n',
+            r'(?:Prepared by|Written by|Created by)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})',
         ]
         
         for pattern in patterns:
-            matches = re.search(pattern, text, re.MULTILINE | re.IGNORECASE)
+            matches = re.search(pattern, text, re.MULTILINE)
             if matches:
                 name = matches.group(1).strip()
                 cleaned_name = self.clean_student_name(name)
@@ -115,9 +175,9 @@ class DeliverableService:
                 cleaned_name = self.clean_student_name(line)
                 if cleaned_name != "Unknown":
                     return cleaned_name
-        
+                
         return "Unknown"
-
+    
     def upload_deliverable(self, assignment_id: str, filename: str, content: bytes,
                           extension: str, content_type: str,
                           extract_name: bool = True) -> str:
