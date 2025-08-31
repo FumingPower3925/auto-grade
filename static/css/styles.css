@@ -117,8 +117,15 @@ body {
     transition: box-shadow 0.2s ease;
 }
 
+.assignment-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
 .assignment-card:hover {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    cursor: pointer;
 }
 
 .assignment-header {
@@ -135,8 +142,7 @@ body {
 
 .assignment-title a {
     text-decoration: none;
-    color: #007bff;
-    transition: color 0.2s ease;
+    color: inherit;
 }
 
 .assignment-title a:hover {
