@@ -67,6 +67,8 @@ async def create_assignment(request: CreateAssignmentRequest) -> AssignmentRespo
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to create assignment")
 
