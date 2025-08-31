@@ -39,12 +39,25 @@
                 </div>
                 
                 <div class="action-buttons">
-                    <button class="btn btn-primary" disabled title="Coming soon">
-                        Submit Deliverable
+                    <button class="btn btn-primary" onclick="showDeliverableUploadModal()">
+                        Upload Deliverables
                     </button>
                     <button class="btn btn-secondary" disabled title="Coming soon">
                         Start Review
                     </button>
+                </div>
+            </div>
+            
+            <!-- Deliverables Section -->
+            <div class="deliverables-section">
+                <div class="section-header">
+                    <h3>Student Deliverables</h3>
+                    <button class="btn btn-small" onclick="showDeliverableUploadModal()">
+                        + Upload Deliverables
+                    </button>
+                </div>
+                <div id="deliverables-list" class="deliverables-grid">
+                    <div class="loading">Loading deliverables...</div>
                 </div>
             </div>
             
@@ -100,6 +113,7 @@
         </div>
     </div>
     
+    <!-- Upload Modal (for rubrics and documents) -->
     <div id="uploadModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -123,9 +137,339 @@
         </div>
     </div>
     
+    <!-- Deliverable Upload Modal -->
+    <div id="deliverableUploadModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Upload Student Deliverables</h2>
+                <span class="close" onclick="hideDeliverableUploadModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <p>Drag and drop PDF files here or click to browse</p>
+                    <input type="file" id="deliverableFileInput" multiple accept=".pdf" style="display: none;">
+                    <button class="btn btn-primary" onclick="document.getElementById('deliverableFileInput').click()">
+                        Select Files
+                    </button>
+                </div>
+                <div id="selectedFiles" class="selected-files" style="display: none;">
+                    <h4>Selected Files:</h4>
+                    <ul id="filesList"></ul>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="extractNames" checked>
+                        Automatically extract student names from documents
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideDeliverableUploadModal()">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary" onclick="uploadDeliverables()" id="uploadDeliverablesBtn" disabled>
+                    Upload Deliverables
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Deliverable Modal -->
+    <div id="editDeliverableModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Deliverable</h2>
+                <span class="close" onclick="hideEditDeliverableModal()">&times;</span>
+            </div>
+            <form id="editDeliverableForm">
+                <input type="hidden" id="editDeliverableId">
+                <div class="form-group">
+                    <label for="editStudentName">Student Name:</label>
+                    <input type="text" id="editStudentName" name="student_name" maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label for="editMark">Mark (0-100):</label>
+                    <input type="number" id="editMark" name="mark" min="0" max="100" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label for="editCertainty">Certainty Threshold (0-1):</label>
+                    <input type="number" id="editCertainty" name="certainty_threshold" min="0" max="1" step="0.01">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="hideEditDeliverableModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Confirm Deletion</h2>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this deliverable?</p>
+                <p class="warning-text">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideDeleteConfirmModal()">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    Delete Deliverable
+                </button>
+            </div>
+        </div>
+    </div>
     <script>
         let currentUploadType = '';
         const assignmentId = '{{ assignment_id }}';
+        let selectedDeliverableFiles = [];
+        let currentDeleteDeliverableId = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDeliverables();
+        });
+        
+        async function loadDeliverables() {
+            try {
+                const response = await fetch(`/api/assignments/${assignmentId}/deliverables`);
+                const data = await response.json();
+                
+                const deliverablesList = document.getElementById('deliverables-list');
+                
+                if (data.deliverables.length === 0) {
+                    deliverablesList.innerHTML = '<p class="no-files">No deliverables uploaded yet.</p>';
+                } else {
+                    deliverablesList.innerHTML = data.deliverables.map(deliverable => `
+                        <div class="deliverable-card">
+                            <div class="deliverable-header">
+                                <h4>${deliverable.student_name}</h4>
+                                <div class="deliverable-actions">
+                                    <button class="btn btn-small" onclick="editDeliverable('${deliverable.id}', '${deliverable.student_name}', ${deliverable.mark || 'null'}, ${deliverable.certainty_threshold || 'null'})">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-small btn-danger" onclick="confirmDeleteDeliverable('${deliverable.id}')">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="deliverable-info">
+                                <div class="info-row">
+                                    <span class="label">File:</span>
+                                    <a href="${deliverable.file_url}" target="_blank">${deliverable.filename}</a>
+                                </div>
+                                <div class="info-row">
+                                    <span class="label">Status:</span>
+                                    <span class="${deliverable.mark_status === 'Marked' ? 'status-marked' : 'status-unmarked'}">
+                                        ${deliverable.mark_status}
+                                    </span>
+                                </div>
+                                ${deliverable.mark !== null ? `
+                                    <div class="info-row">
+                                        <span class="label">Mark:</span>
+                                        <span>${deliverable.mark.toFixed(2)}</span>
+                                    </div>
+                                ` : ''}
+                                ${deliverable.certainty_threshold !== null ? `
+                                    <div class="info-row">
+                                        <span class="label">Certainty:</span>
+                                        <span>${(deliverable.certainty_threshold * 100).toFixed(0)}%</span>
+                                    </div>
+                                ` : ''}
+                                <div class="info-row">
+                                    <span class="label">Uploaded:</span>
+                                    <span>${new Date(deliverable.uploaded_at).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading deliverables:', error);
+                document.getElementById('deliverables-list').innerHTML = 
+                    '<p class="error-message">Error loading deliverables</p>';
+            }
+        }
+        
+        function showDeliverableUploadModal() {
+            document.getElementById('deliverableUploadModal').style.display = 'block';
+            selectedDeliverableFiles = [];
+            updateSelectedFilesList();
+        }
+        
+        function hideDeliverableUploadModal() {
+            document.getElementById('deliverableUploadModal').style.display = 'none';
+            document.getElementById('deliverableFileInput').value = '';
+            selectedDeliverableFiles = [];
+            updateSelectedFilesList();
+        }
+        
+        document.getElementById('deliverableFileInput').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            selectedDeliverableFiles = files.filter(file => file.type === 'application/pdf');
+            updateSelectedFilesList();
+        });
+        
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            
+            const files = Array.from(e.dataTransfer.files);
+            selectedDeliverableFiles = files.filter(file => file.type === 'application/pdf');
+            updateSelectedFilesList();
+        });
+        
+        function updateSelectedFilesList() {
+            const selectedFilesDiv = document.getElementById('selectedFiles');
+            const filesList = document.getElementById('filesList');
+            const uploadBtn = document.getElementById('uploadDeliverablesBtn');
+            
+            if (selectedDeliverableFiles.length > 0) {
+                selectedFilesDiv.style.display = 'block';
+                filesList.innerHTML = selectedDeliverableFiles.map(file => 
+                    `<li>${file.name} (${(file.size / 1024).toFixed(2)} KB)</li>`
+                ).join('');
+                uploadBtn.disabled = false;
+            } else {
+                selectedFilesDiv.style.display = 'none';
+                uploadBtn.disabled = true;
+            }
+        }
+        
+        async function uploadDeliverables() {
+            if (selectedDeliverableFiles.length === 0) return;
+            
+            const uploadBtn = document.getElementById('uploadDeliverablesBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            
+            const formData = new FormData();
+            selectedDeliverableFiles.forEach(file => {
+                formData.append('files', file);
+            });
+            formData.append('extract_names', document.getElementById('extractNames').checked);
+            
+            try {
+                const endpoint = selectedDeliverableFiles.length === 1 
+                    ? `/api/assignments/${assignmentId}/deliverables`
+                    : `/api/assignments/${assignmentId}/deliverables/bulk`;
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    hideDeliverableUploadModal();
+                    loadDeliverables();
+                } else {
+                    const error = await response.json();
+                    alert('Error uploading deliverables: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error uploading deliverables: ' + error.message);
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Deliverables';
+            }
+        }
+        
+        function editDeliverable(id, studentName, mark, certainty) {
+            document.getElementById('editDeliverableId').value = id;
+            document.getElementById('editStudentName').value = studentName;
+            document.getElementById('editMark').value = mark !== null ? mark : '';
+            document.getElementById('editCertainty').value = certainty !== null ? certainty : '';
+            document.getElementById('editDeliverableModal').style.display = 'block';
+        }
+        
+        function hideEditDeliverableModal() {
+            document.getElementById('editDeliverableModal').style.display = 'none';
+            document.getElementById('editDeliverableForm').reset();
+        }
+        
+        document.getElementById('editDeliverableForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const deliverableId = document.getElementById('editDeliverableId').value;
+            const data = {};
+            
+            const studentName = document.getElementById('editStudentName').value;
+            const mark = document.getElementById('editMark').value;
+            const certainty = document.getElementById('editCertainty').value;
+            
+            if (studentName) data.student_name = studentName;
+            if (mark !== '') data.mark = parseFloat(mark);
+            if (certainty !== '') data.certainty_threshold = parseFloat(certainty);
+            
+            try {
+                const response = await fetch(`/api/deliverables/${deliverableId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    hideEditDeliverableModal();
+                    loadDeliverables();
+                } else {
+                    const error = await response.json();
+                    alert('Error updating deliverable: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error updating deliverable: ' + error.message);
+            }
+        });
+        
+        function confirmDeleteDeliverable(id) {
+            currentDeleteDeliverableId = id;
+            document.getElementById('deleteConfirmModal').style.display = 'block';
+        }
+        
+        function hideDeleteConfirmModal() {
+            document.getElementById('deleteConfirmModal').style.display = 'none';
+            currentDeleteDeliverableId = null;
+        }
+        
+        document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+            if (!currentDeleteDeliverableId) return;
+            
+            try {
+                const response = await fetch(`/api/deliverables/${currentDeleteDeliverableId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    hideDeleteConfirmModal();
+                    loadDeliverables();
+                } else {
+                    alert('Error deleting deliverable');
+                }
+            } catch (error) {
+                alert('Error deleting deliverable: ' + error.message);
+            }
+        });
         
         function showUploadModal(type) {
             currentUploadType = type;
@@ -176,9 +520,11 @@
         });
         
         window.onclick = function(event) {
-            const modal = document.getElementById('uploadModal');
-            if (event.target == modal) {
-                hideUploadModal();
+            if (event.target.className === 'modal') {
+                if (event.target.id === 'uploadModal') hideUploadModal();
+                if (event.target.id === 'deliverableUploadModal') hideDeliverableUploadModal();
+                if (event.target.id === 'editDeliverableModal') hideEditDeliverableModal();
+                if (event.target.id === 'deleteConfirmModal') hideDeleteConfirmModal();
             }
         }
     </script>
