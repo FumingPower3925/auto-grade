@@ -1,11 +1,13 @@
 import os
 import re
-import base64
 from typing import List, Optional, Tuple
 from src.repository.db.factory import get_database_repository
 from src.repository.db.models import DeliverableModel
-import requests
-import json
+import io
+from pypdf import PdfReader
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DeliverableService:
@@ -13,10 +15,9 @@ class DeliverableService:
 
     def __init__(self) -> None:
         self.db_repository = get_database_repository()
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
     def extract_student_name_from_pdf(self, pdf_content: bytes) -> Tuple[str, Optional[str]]:
-        """Extract student name from PDF content using OpenAI API.
+        """Extract student name from PDF content using PyPDF2.
         
         Args:
             pdf_content: The PDF content as bytes.
@@ -24,63 +25,32 @@ class DeliverableService:
         Returns:
             A tuple of (student_name, extracted_text).
         """
-        if not self.openai_api_key:
-            return ("Unknown", None)
-        
         try:
-            # Convert PDF content to base64 for OpenAI Vision API
-            base64_pdf = base64.b64encode(pdf_content).decode('utf-8')
+            pdf_file = io.BytesIO(pdf_content)
             
-            # Use OpenAI's GPT-4 Vision to extract text and find student name
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.openai_api_key}"
-            }
+            pdf_reader = PdfReader(pdf_file)
             
-            # Note: In production, you'd use a proper PDF to text extraction library first
-            # For now, we'll simulate with a text extraction request
-            # In reality, you'd need to convert PDF to images or use a PDF extraction service
+            extracted_text = ""
+            pages_to_check = min(3, len(pdf_reader.pages))
             
-            payload = {
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant that extracts student names from academic documents. "
-                                   "Look for patterns like 'Name:', 'Student:', 'Author:', 'Submitted by:', "
-                                   "or names at the beginning of the document. Return ONLY the student name or 'Unknown' if not found."
-                    },
-                    {
-                        "role": "user",
-                        "content": "Extract the student name from this document. Return only the name or 'Unknown'."
-                    }
-                ],
-                "max_tokens": 50,
-                "temperature": 0
-            }
+            for page_num in range(pages_to_check):
+                try:
+                    page = pdf_reader.pages[page_num]
+                    page_text = page.extract_text()
+                    extracted_text += page_text + "\n"
+                except Exception as e:
+                    logger.warning(f"Failed to extract text from page {page_num}: {e}")
+                    continue
             
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                data=json.dumps(payload),
-                timeout=30
-            )
+            student_name = self.extract_name_from_text(extracted_text)
             
-            if response.status_code == 200:
-                result = response.json()
-                student_name = result.get("choices", [{}])[0].get("message", {}).get("content", "Unknown").strip()
-                
-                # Clean up the extracted name
-                student_name = self._clean_student_name(student_name)
-                
-                return (student_name, None)  # Could return extracted text if needed
-            else:
-                return ("Unknown", None)
-                
-        except Exception:
+            return (student_name, extracted_text[:5000] if extracted_text else None)
+            
+        except Exception as e:
+            logger.error(f"Failed to extract text from PDF: {e}")
             return ("Unknown", None)
 
-    def _clean_student_name(self, name: str) -> str:
+    def clean_student_name(self, name: str) -> str:
         """Clean and validate the extracted student name.
         
         Args:
@@ -92,24 +62,61 @@ class DeliverableService:
         if not name or name.lower() in ["unknown", "not found", "n/a", "none"]:
             return "Unknown"
         
-        # Remove common prefixes
-        prefixes_to_remove = ["Name:", "Student:", "Author:", "Submitted by:", "By:"]
+        prefixes_to_remove = ["Name:", "Student:", "Author:", "Submitted by:", "By:", "Student Name:"]
         for prefix in prefixes_to_remove:
-            if name.startswith(prefix):
+            if name.lower().startswith(prefix.lower()):
                 name = name[len(prefix):].strip()
         
-        # Remove special characters but keep spaces and hyphens
-        name = re.sub(r'[^a-zA-Z0-9\s\-\']', '', name).strip()
+        name = re.sub(r'[^a-zA-Z0-9\s\-\'\.]', ' ', name)
+        name = re.sub(r'\s+', ' ', name).strip()
         
-        # Validate the name (should have at least one letter)
         if not re.search(r'[a-zA-Z]', name):
             return "Unknown"
         
-        # Limit length
+        if len(name) < 2 or name.replace(' ', '').isdigit():
+            return "Unknown"
+        
         if len(name) > 100:
             name = name[:100]
         
         return name if name else "Unknown"
+
+    def extract_name_from_text(self, text: str) -> str:
+        """Extract student name from text using pattern matching.
+        
+        Args:
+            text: The extracted text from the PDF.
+            
+        Returns:
+            The extracted student name or "Unknown".
+        """
+        if not text:
+            return "Unknown"
+        
+        patterns = [
+            r'(?:Name|Student|Author|Submitted by|By|Student Name)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)',
+            r'^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)\s*\n',
+            r'([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)\s*\n.*(?:Assignment|Homework|Project)',
+            r'(?:Prepared by|Written by|Created by)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)+)',
+        ]
+        
+        for pattern in patterns:
+            matches = re.search(pattern, text, re.MULTILINE | re.IGNORECASE)
+            if matches:
+                name = matches.group(1).strip()
+                cleaned_name = self.clean_student_name(name)
+                if cleaned_name != "Unknown":
+                    return cleaned_name
+        
+        lines = text.split('\n')[:10]
+        for line in lines:
+            line = line.strip()
+            if re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$', line):
+                cleaned_name = self.clean_student_name(line)
+                if cleaned_name != "Unknown":
+                    return cleaned_name
+        
+        return "Unknown"
 
     def upload_deliverable(self, assignment_id: str, filename: str, content: bytes,
                           extension: str, content_type: str,
@@ -127,19 +134,17 @@ class DeliverableService:
         Returns:
             The ID of the uploaded deliverable.
         """
-        # Check if assignment exists
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
         
-        # Extract student name if requested and file is PDF
         student_name = "Unknown"
         extracted_text = None
         
         if extract_name and extension.lower() == "pdf":
             student_name, extracted_text = self.extract_student_name_from_pdf(content)
+            logger.info(f"Extracted student name: {student_name}")
         
-        # Store the deliverable
         return self.db_repository.store_deliverable(
             assignment_id=assignment_id,
             filename=filename,
@@ -163,7 +168,6 @@ class DeliverableService:
         Returns:
             List of IDs of the uploaded deliverables.
         """
-        # Check if assignment exists
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
@@ -181,8 +185,8 @@ class DeliverableService:
                     extract_name=extract_names
                 )
                 deliverable_ids.append(deliverable_id)
-            except Exception:
-                # Log error but continue with other files
+            except Exception as e:
+                logger.error(f"Failed to upload {filename}: {e}")
                 continue
         
         return deliverable_ids
@@ -201,12 +205,10 @@ class DeliverableService:
         Returns:
             True if the deliverable was updated, False otherwise.
         """
-        # Check if deliverable exists
         deliverable = self.db_repository.get_deliverable(deliverable_id)
         if not deliverable:
             return False
         
-        # Prepare update data
         update_data: dict[str, float | str] = {}
         
         if student_name is not None:
@@ -270,7 +272,6 @@ class DeliverableService:
         Returns:
             A tuple of (is_valid, error_message).
         """
-        # Currently only support PDF
         supported_extensions = [".pdf"]
         supported_mime_types = ["application/pdf"]
         

@@ -1,8 +1,8 @@
 import pytest
+from typing import Any, Dict
 from pydantic import ValidationError
 from bson import ObjectId
 from datetime import datetime, timezone
-from typing import Optional
 
 from src.repository.db.models import DeliverableModel
 
@@ -63,16 +63,13 @@ class TestDeliverableModel:
 
     def test_mark_validation_valid(self) -> None:
         """Test valid mark values."""
-        # Test boundary values
         assert DeliverableModel.validate_mark(0.0) == 0.0
         assert DeliverableModel.validate_mark(100.0) == 100.0
         assert DeliverableModel.validate_mark(50.0) == 50.0
         
-        # Test rounding
         assert DeliverableModel.validate_mark(85.556) == 85.56
         assert DeliverableModel.validate_mark(92.111) == 92.11
         
-        # Test None
         assert DeliverableModel.validate_mark(None) is None
 
     def test_mark_validation_invalid(self) -> None:
@@ -91,16 +88,13 @@ class TestDeliverableModel:
 
     def test_certainty_threshold_validation_valid(self) -> None:
         """Test valid certainty threshold values."""
-        # Test boundary values
         assert DeliverableModel.validate_certainty(0.0) == 0.0
         assert DeliverableModel.validate_certainty(1.0) == 1.0
         assert DeliverableModel.validate_certainty(0.5) == 0.5
         
-        # Test rounding
         assert DeliverableModel.validate_certainty(0.856) == 0.86
         assert DeliverableModel.validate_certainty(0.921) == 0.92
         
-        # Test None
         assert DeliverableModel.validate_certainty(None) is None
 
     def test_certainty_threshold_validation_invalid(self) -> None:
@@ -159,7 +153,7 @@ class TestDeliverableModel:
         assignment_id = ObjectId()
         now = datetime.now(timezone.utc)
         
-        data = {
+        data: Dict[str, Any] = {
             "_id": deliverable_id,
             "assignment_id": assignment_id,
             "student_name": "Jane Smith",
@@ -188,7 +182,7 @@ class TestDeliverableModel:
         deliverable_id = str(ObjectId())
         assignment_id = str(ObjectId())
         
-        data = {
+        data: Dict[str, Any] = {
             "_id": deliverable_id,
             "assignment_id": assignment_id,
             "filename": "test.pdf",
@@ -204,13 +198,13 @@ class TestDeliverableModel:
 
     def test_model_validation_with_invalid_mark(self) -> None:
         """Test model validation with invalid mark value."""
-        data = {
+        data: Dict[str, Any] = {
             "assignment_id": ObjectId(),
             "filename": "test.pdf",
             "content": b"content",
             "extension": "pdf",
             "content_type": "application/pdf",
-            "mark": 150.0  # Invalid mark
+            "mark": 150.0
         }
         
         with pytest.raises(ValidationError) as exc_info:
@@ -220,14 +214,13 @@ class TestDeliverableModel:
         assert any("mark" in str(error) for error in errors)
 
     def test_model_validation_with_invalid_certainty(self) -> None:
-        """Test model validation with invalid certainty threshold."""
-        data = {
+        data: Dict[str, Any] = {
             "assignment_id": ObjectId(),
             "filename": "test.pdf",
             "content": b"content",
             "extension": "pdf",
             "content_type": "application/pdf",
-            "certainty_threshold": 1.5  # Invalid certainty
+            "certainty_threshold": 1.5
         }
         
         with pytest.raises(ValidationError) as exc_info:
@@ -240,14 +233,13 @@ class TestDeliverableModel:
         """Test model with empty student name defaults to 'Unknown'."""
         deliverable = DeliverableModel(
             assignment_id=ObjectId(),
-            student_name="",  # Empty string
+            student_name="",
             filename="test.pdf",
             content=b"content",
             extension="pdf",
             content_type="application/pdf"
         )
         
-        # Empty string is allowed, but default is "Unknown" if not provided
         assert deliverable.student_name == ""
 
     def test_model_copy_with_update(self) -> None:
@@ -262,7 +254,6 @@ class TestDeliverableModel:
             content_type="application/pdf"
         )
         
-        # Create a copy with updates
         updated = original.model_copy(update={
             "student_name": "Updated Name",
             "mark": 85.0,
@@ -272,8 +263,8 @@ class TestDeliverableModel:
         assert updated.student_name == "Updated Name"
         assert updated.mark == 85.0
         assert updated.certainty_threshold == 0.90
-        assert updated.filename == original.filename  # Unchanged
-        assert updated.assignment_id == original.assignment_id  # Unchanged
+        assert updated.filename == original.filename
+        assert updated.assignment_id == original.assignment_id
 
     def test_model_json_serialization(self) -> None:
         """Test JSON serialization of the model."""
@@ -291,7 +282,6 @@ class TestDeliverableModel:
         json_str = deliverable.model_dump_json()
         assert isinstance(json_str, str)
         
-        # Check that important fields are in the JSON
         assert "student_name" in json_str
         assert "Test Student" in json_str
         assert "88.5" in json_str
@@ -299,7 +289,7 @@ class TestDeliverableModel:
 
     def test_model_with_null_optional_fields(self) -> None:
         """Test model with null/None optional fields."""
-        data = {
+        data: Dict[str, Any] = {
             "assignment_id": ObjectId(),
             "student_name": "Student Name",
             "mark": None,

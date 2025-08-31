@@ -43,15 +43,39 @@ class TestDeliverableE2E:
         # Wait for modal to close
         page.wait_for_selector("#createAssignmentModal", state="hidden")
         
-        # Get the assignment ID from the newly created assignment link
-        page.wait_for_selector(".assignment-card", timeout=5000)
-        assignment_link = page.locator(".assignment-card").first.locator("a").first
-        href = assignment_link.get_attribute("href")
+        # Wait for the assignments to be loaded (triggered by HTMX)
+        page.wait_for_timeout(2000)  # Give HTMX time to update
         
-        if href:
-            match = re.search(r'/assignments/([a-f0-9]+)', href)
-            if match:
-                return match.group(1)
+        # Get the assignment ID from the newly created assignment
+        # Look for the assignment card with our test name
+        assignment_cards = page.locator(".assignment-card")
+        cards_count = assignment_cards.count()
+        
+        if cards_count > 0:
+            # Find the card with our test assignment name
+            for i in range(cards_count):
+                card = assignment_cards.nth(i)
+                title_elem = card.locator(".assignment-title")
+                if title_elem.count() > 0:
+                    title_text = title_elem.text_content()
+                    if title_text and "E2E Deliverable Test Assignment" in title_text:
+                        # Get the link from this card
+                        link = card.locator("a").first
+                        if link.count() > 0:
+                            href = link.get_attribute("href")
+                            if href:
+                                match = re.search(r'/assignments/([a-f0-9]+)', href)
+                                if match:
+                                    return match.group(1)
+        
+        # If we couldn't find the assignment, try a different approach
+        # Navigate to the assignments page and extract from URL
+        page.click(".assignment-card:has-text('E2E Deliverable Test Assignment')")
+        page.wait_for_url(re.compile(r"/assignments/[a-f0-9]+"))
+        current_url = page.url
+        match = re.search(r'/assignments/([a-f0-9]+)', current_url)
+        if match:
+            return match.group(1)
         
         return ""
 
@@ -239,14 +263,10 @@ class TestDeliverableE2E:
         expect(upload_area).to_be_visible()
         
         # Simulate drag over (visual feedback test)
-        upload_area.dispatch_event("dragover")
-        
-        # The area should have the drag-over class
-        # Note: We can't fully test drag-and-drop file upload in Playwright,
-        # but we can test that the visual feedback works
+        upload_area.dispatch_event("dragover") # type: ignore
         
         # Simulate drag leave
-        upload_area.dispatch_event("dragleave")
+        upload_area.dispatch_event("dragleave") # type: ignore
 
     def test_deliverable_card_information_display(self, page: Page) -> None:
         """Test that deliverable cards show correct information."""

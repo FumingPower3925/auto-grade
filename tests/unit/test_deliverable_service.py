@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import patch, MagicMock
 import pytest
 from typing import List, Tuple
 from src.service.deliverable_service import DeliverableService
@@ -22,28 +22,22 @@ class TestDeliverableService:
 
     @patch('src.service.deliverable_service.requests.post')
     @patch('src.service.deliverable_service.get_database_repository')
-    def test_extract_student_name_from_pdf_success(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
-        """Test successful student name extraction from PDF."""
-        with patch('os.getenv', return_value="test_api_key"):
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "John Doe"
-                        }
-                    }
-                ]
-            }
-            mock_post.return_value = mock_response
+    def test_extract_student_name_from_pdf_success(self, mock_get_repo: MagicMock) -> None:
+        """Test successful student name extraction from PDF using PyPDF2."""
+        with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+            mock_page = MagicMock()
+            mock_page.extract_text.return_value = "Name: John Doe\nAssignment 1\nIntroduction..."
+            
+            mock_reader_instance = MagicMock()
+            mock_reader_instance.pages = [mock_page]
+            mock_pdf_reader.return_value = mock_reader_instance
             
             service = DeliverableService()
             name, text = service.extract_student_name_from_pdf(b"pdf content")
             
             assert name == "John Doe"
-            assert text is None
-            mock_post.assert_called_once()
+            assert text is not None
+            assert "John Doe" in text
 
     @patch('src.service.deliverable_service.requests.post')
     @patch('src.service.deliverable_service.get_database_repository')
@@ -62,10 +56,10 @@ class TestDeliverableService:
 
     @patch('src.service.deliverable_service.requests.post')
     @patch('src.service.deliverable_service.get_database_repository')
-    def test_extract_student_name_from_pdf_exception(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+    def test_extract_student_name_from_pdf_exception(self, mock_get_repo: MagicMock) -> None:
         """Test extraction when an exception occurs."""
-        with patch('os.getenv', return_value="test_api_key"):
-            mock_post.side_effect = Exception("Network error")
+        with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+            mock_pdf_reader.side_effect = Exception("PDF parsing error")
             
             service = DeliverableService()
             name, text = service.extract_student_name_from_pdf(b"pdf content")
@@ -78,30 +72,26 @@ class TestDeliverableService:
         """Test cleaning student names."""
         service = DeliverableService()
         
-        # Test various name formats
-        assert service._clean_student_name("John Doe") == "John Doe"
-        assert service._clean_student_name("Name: Jane Smith") == "Jane Smith"
-        assert service._clean_student_name("Student: Bob Johnson") == "Bob Johnson"
-        assert service._clean_student_name("Author: Alice Brown") == "Alice Brown"
-        assert service._clean_student_name("Submitted by: Charlie Davis") == "Charlie Davis"
-        assert service._clean_student_name("By: Emily Wilson") == "Emily Wilson"
+        assert service.clean_student_name("John Doe") == "John Doe"
+        assert service.clean_student_name("Name: Jane Smith") == "Jane Smith"
+        assert service.clean_student_name("Student: Bob Johnson") == "Bob Johnson"
+        assert service.clean_student_name("Author: Alice Brown") == "Alice Brown"
+        assert service.clean_student_name("Submitted by: Charlie Davis") == "Charlie Davis"
+        assert service.clean_student_name("By: Emily Wilson") == "Emily Wilson"
         
-        # Test invalid names
-        assert service._clean_student_name("") == "Unknown"
-        assert service._clean_student_name("unknown") == "Unknown"
-        assert service._clean_student_name("not found") == "Unknown"
-        assert service._clean_student_name("n/a") == "Unknown"
-        assert service._clean_student_name("none") == "Unknown"
-        assert service._clean_student_name("123456") == "Unknown"
-        assert service._clean_student_name("!@#$%^") == "Unknown"
+        assert service.clean_student_name("") == "Unknown"
+        assert service.clean_student_name("unknown") == "Unknown"
+        assert service.clean_student_name("not found") == "Unknown"
+        assert service.clean_student_name("n/a") == "Unknown"
+        assert service.clean_student_name("none") == "Unknown"
+        assert service.clean_student_name("123456") == "Unknown"
+        assert service.clean_student_name("!@#$%^") == "Unknown"
         
-        # Test special characters
-        assert service._clean_student_name("John@Doe#2024") == "John Doe 2024"
-        assert service._clean_student_name("Mary-Jane O'Neill") == "Mary-Jane O'Neill"
+        assert service.clean_student_name("John@Doe#2024") == "John Doe 2024"
+        assert service.clean_student_name("Mary-Jane O'Neill") == "Mary-Jane O'Neill"
         
-        # Test long names
         long_name = "A" * 150
-        cleaned = service._clean_student_name(long_name)
+        cleaned = service.clean_student_name(long_name)
         assert len(cleaned) == 100
 
     @patch('src.service.deliverable_service.get_database_repository')
@@ -268,7 +258,6 @@ class TestDeliverableService:
                 extract_names=False
             )
         
-        # Should have uploaded file1 and file3, skipped file2 due to error
         assert deliverable_ids == ["id1", "id3"]
 
     @patch('src.service.deliverable_service.get_database_repository')
@@ -516,3 +505,152 @@ class TestDeliverableService:
         assert is_valid is False
         assert "Content type not supported" in error
         assert "application/pdf" in error
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_student_name_from_pdf_no_text(self, mock_get_repo: MagicMock) -> None:
+        """Test extracting student name when PDF has no readable text."""
+        with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+            mock_reader_instance = MagicMock()
+            mock_reader_instance.pages = []
+            mock_pdf_reader.return_value = mock_reader_instance
+            
+            service = DeliverableService()
+            name, text = service.extract_student_name_from_pdf(b"pdf content")
+            
+            assert name == "Unknown"
+            assert text is None
+    
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_student_name_from_pdf_with_pattern(self, mock_get_repo: MagicMock) -> None:
+        """Test extracting student name with various patterns."""
+        test_cases = [
+            ("Student: Jane Smith\nHomework Assignment", "Jane Smith"),
+            ("Submitted by: Bob Johnson\nDate: 2024", "Bob Johnson"),
+            ("Alice Brown\nCS101 Assignment", "Alice Brown"),
+            ("Author: Charlie Davis\n\nIntroduction", "Charlie Davis"),
+        ]
+        
+        service = DeliverableService()
+        
+        for pdf_text, expected_name in test_cases:
+            with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+                mock_page = MagicMock()
+                mock_page.extract_text.return_value = pdf_text
+                
+                mock_reader_instance = MagicMock()
+                mock_reader_instance.pages = [mock_page]
+                mock_pdf_reader.return_value = mock_reader_instance
+                
+                name = service.extract_student_name_from_pdf(b"pdf content")
+                assert name == expected_name, f"Failed for pattern: {pdf_text}"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_from_text(self, mock_get_repo: MagicMock) -> None:
+        """Test the _extract_name_from_text method."""
+        service = DeliverableService()
+        
+        assert service.extract_name_from_text("") == "Unknown"
+        
+        text = "Name: John Smith\nAssignment 1"
+        assert service.extract_name_from_text(text) == "John Smith"
+        
+        text = "Jane Doe\nComputer Science Assignment"
+        assert service.extract_name_from_text(text) == "Jane Doe"
+        
+        text = "This is just some random text without a name"
+        assert service.extract_name_from_text(text) == "Unknown"
+    
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_upload_deliverable_with_name_extraction_logging(self, mock_get_repo: MagicMock) -> None:
+        """Test that name extraction logs the extracted name."""
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test Assignment",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.return_value = "deliverable_id_123"
+        mock_get_repo.return_value = mock_repo
+        
+        with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+            mock_page = MagicMock()
+            mock_page.extract_text.return_value = "Name: John Doe\nAssignment"
+            mock_reader_instance = MagicMock()
+            mock_reader_instance.pages = [mock_page]
+            mock_pdf_reader.return_value = mock_reader_instance
+            
+            with patch('src.service.deliverable_service.logger') as mock_logger:
+                service = DeliverableService()
+                service.upload_deliverable(
+                    "assignment_id",
+                    "submission.pdf",
+                    b"pdf content",
+                    "pdf",
+                    "application/pdf",
+                    extract_name=True
+                )
+                
+                mock_logger.info.assert_called_with("Extracted student name: John Doe")
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_pdf_with_page_extraction_failure(self, mock_get_repo: MagicMock) -> None:
+        """Test PDF extraction when a page fails to extract."""
+        with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
+            mock_page1 = MagicMock()
+            mock_page1.extract_text.side_effect = Exception("Page extraction error")
+            
+            mock_page2 = MagicMock()
+            mock_page2.extract_text.return_value = "Name: Jane Smith"
+            
+            mock_reader_instance = MagicMock()
+            mock_reader_instance.pages = [mock_page1, mock_page2]
+            mock_pdf_reader.return_value = mock_reader_instance
+            
+            with patch('src.service.deliverable_service.logger') as mock_logger:
+                service = DeliverableService()
+                name = service.extract_student_name_from_pdf(b"pdf content")
+                
+                assert name == "Jane Smith"
+                mock_logger.warning.assert_called()
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_upload_multiple_deliverables_with_failure_logging(self, mock_get_repo: MagicMock) -> None:
+        """Test that failed uploads in bulk are logged."""
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test Assignment",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        
+        mock_repo.store_deliverable.side_effect = ["id1", Exception("Upload failed"), "id3"]
+        mock_get_repo.return_value = mock_repo
+        
+        files: List[Tuple[str, bytes, str, str]] = [
+            ("file1.pdf", b"content1", "pdf", "application/pdf"),
+            ("file2.pdf", b"content2", "pdf", "application/pdf"),
+            ("file3.pdf", b"content3", "pdf", "application/pdf")
+        ]
+        
+        with patch('src.service.deliverable_service.logger') as mock_logger:
+            service = DeliverableService()
+            deliverable_ids = service.upload_multiple_deliverables(
+                "assignment_id",
+                files,
+                extract_names=False
+            )
+            
+            assert deliverable_ids == ["id1", "id3"]
+            mock_logger.error.assert_called()

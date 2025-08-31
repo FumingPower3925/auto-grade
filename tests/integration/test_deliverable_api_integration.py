@@ -3,7 +3,6 @@ from fastapi import status
 from typing import Dict, Any, List
 from httpx import Response
 import io
-import pytest
 
 from src.controller.api.api import app
 from config.config import ConfigManager
@@ -37,7 +36,6 @@ class TestDeliverableAPIIntegration:
 
     def test_full_deliverable_workflow(self) -> None:
         """Test complete deliverable workflow from upload to deletion."""
-        # Step 1: Create an assignment
         assignment_data: Dict[str, Any] = {
             "name": "Integration Test Assignment",
             "confidence_threshold": 0.85
@@ -48,7 +46,6 @@ class TestDeliverableAPIIntegration:
         assignment: Dict[str, Any] = create_response.json()
         self.test_assignment_id = assignment["id"]
         
-        # Step 2: Upload a single deliverable
         pdf_content = b"%PDF-1.4 Test PDF content"
         upload_response: Response = self.client.post(
             f"/assignments/{self.test_assignment_id}/deliverables",
@@ -62,7 +59,6 @@ class TestDeliverableAPIIntegration:
         assert deliverable["student_name"] == "Unknown"
         self.test_deliverable_ids.append(deliverable["id"])
         
-        # Step 3: List deliverables
         list_response: Response = self.client.get(f"/assignments/{self.test_assignment_id}/deliverables")
         assert list_response.status_code == status.HTTP_200_OK
         deliverables_list: Dict[str, Any] = list_response.json()
@@ -71,8 +67,7 @@ class TestDeliverableAPIIntegration:
         assert deliverables_list["deliverables"][0]["id"] == deliverable["id"]
         assert deliverables_list["deliverables"][0]["mark_status"] == "Unmarked"
         
-        # Step 4: Update the deliverable
-        update_data = {
+        update_data: Dict[str, Any] = {
             "student_name": "John Doe",
             "mark": 85.5,
             "certainty_threshold": 0.95
@@ -159,8 +154,7 @@ class TestDeliverableAPIIntegration:
         assignment: Dict[str, Any] = create_response.json()
         self.test_assignment_id = assignment["id"]
         
-        # Try to upload a non-PDF file
-        docx_content = b"PK\x03\x04 DOCX content"  # DOCX magic bytes
+        docx_content = b"PK\x03\x04 DOCX content"
         upload_response: Response = self.client.post(
             f"/assignments/{self.test_assignment_id}/deliverables",
             files={"file": ("document.docx", io.BytesIO(docx_content), 

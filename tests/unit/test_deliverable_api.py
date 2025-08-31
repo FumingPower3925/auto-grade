@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 from fastapi import status
-from typing import Dict, Any, List
+from typing import Dict, Any
 from httpx import Response
 from unittest.mock import patch, MagicMock
 import io
@@ -70,7 +70,7 @@ class TestDeliverableEndpoints:
         )
         
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        assert "Filename is required" in response.json()["detail"]
+        assert any("file" in str(error) for error in response.json()["detail"])
 
     @patch('src.controller.api.api.DeliverableService')
     def test_upload_deliverable_invalid_format(self, mock_service_class: MagicMock) -> None:
@@ -226,13 +226,11 @@ class TestDeliverableEndpoints:
         assert data["total"] == 2
         assert len(data["deliverables"]) == 2
         
-        # Check first deliverable
         assert data["deliverables"][0]["student_name"] == "John Doe"
         assert data["deliverables"][0]["mark"] == 85.5
         assert data["deliverables"][0]["mark_status"] == "Marked"
         assert data["deliverables"][0]["certainty_threshold"] == 0.95
         
-        # Check second deliverable
         assert data["deliverables"][1]["student_name"] == "Jane Smith"
         assert data["deliverables"][1]["mark"] is None
         assert data["deliverables"][1]["mark_status"] == "Unmarked"
@@ -272,7 +270,7 @@ class TestDeliverableEndpoints:
         mock_service.get_deliverable.return_value = mock_deliverable
         mock_service_class.return_value = mock_service
         
-        update_data = {
+        update_data: Dict[str, Any] = {
             "student_name": "Updated Name",
             "mark": 90.0,
             "certainty_threshold": 0.85
@@ -305,7 +303,6 @@ class TestDeliverableEndpoints:
     def test_update_deliverable_invalid_mark(self, mock_service_class: MagicMock) -> None:
         """Test updating deliverable with invalid mark."""
         mock_service = MagicMock()
-        mock_service.update_deliverable.side_effect = ValueError("Mark must be between 0.0 and 100.0")
         mock_service_class.return_value = mock_service
         
         update_data = {"mark": 150.0}
@@ -313,7 +310,8 @@ class TestDeliverableEndpoints:
         response: Response = self.client.patch("/deliverables/deliverable_id", json=update_data)
         
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        assert "Mark must be between 0.0 and 100.0" in response.json()["detail"]
+        errors = response.json()["detail"]
+        assert any("less than or equal to 100" in str(error.get("msg", "")) for error in errors)
 
     @patch('src.controller.api.api.DeliverableService')
     def test_delete_deliverable_success(self, mock_service_class: MagicMock) -> None:
