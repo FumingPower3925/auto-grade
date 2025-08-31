@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ assignment.name }} - Auto Grade</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="/static/js/htmx-v2.0.6.min.js"></script>
+    <script src="/static/js/htmx-class-tools-v2.0.2.min.js"></script>
+</head>
+<body hx-ext="class-tools">
+    {% include 'templates/navbar.html' %}
+    
+    <div class="container">
+        <div class="breadcrumbs">
+            <a href="/">Home</a> / <span>{{ assignment.name }}</span>
+        </div>
+        
+        <div class="assignment-detail">
+            <h1>{{ assignment.name }}</h1>
+            
+            <div class="assignment-info">
+                <div class="info-card">
+                    <h3>Assignment Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Confidence Threshold:</label>
+                            <span>{{ "%.2f"|format(assignment.confidence_threshold) }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Created:</label>
+                            <span>{{ assignment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Last Updated:</label>
+                            <span>{{ assignment.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-primary" disabled title="Coming soon">
+                        Submit Deliverable
+                    </button>
+                    <button class="btn btn-secondary" disabled title="Coming soon">
+                        Start Review
+                    </button>
+                </div>
+            </div>
+            
+            <div class="files-section">
+                <div class="file-section">
+                    <div class="section-header">
+                        <h3>Evaluation Rubrics ({{ rubrics|length }})</h3>
+                        <button class="btn btn-small" onclick="showUploadModal('rubric')">
+                            + Upload Rubric
+                        </button>
+                    </div>
+                    <div class="file-list">
+                        {% if rubrics %}
+                            {% for rubric in rubrics %}
+                            <div class="file-item">
+                                <span class="file-name">{{ rubric.filename }}</span>
+                                <span class="file-date">{{ rubric.uploaded_at.strftime('%Y-%m-%d') }}</span>
+                                <a href="/api/files/{{ rubric.id }}" class="btn btn-small" download>
+                                    Download
+                                </a>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="no-files">No rubrics uploaded yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="file-section">
+                    <div class="section-header">
+                        <h3>Relevant Documents & Examples ({{ documents|length }})</h3>
+                        <button class="btn btn-small" onclick="showUploadModal('document')">
+                            + Upload Document
+                        </button>
+                    </div>
+                    <div class="file-list">
+                        {% if documents %}
+                            {% for doc in documents %}
+                            <div class="file-item">
+                                <span class="file-name">{{ doc.filename }}</span>
+                                <span class="file-date">{{ doc.uploaded_at.strftime('%Y-%m-%d') }}</span>
+                                <a href="/api/files/{{ doc.id }}" class="btn btn-small" download>
+                                    Download
+                                </a>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="no-files">No documents uploaded yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="uploadModalTitle">Upload File</h2>
+                <span class="close" onclick="hideUploadModal()">&times;</span>
+            </div>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="fileInput">Select File:</label>
+                    <input type="file" id="fileInput" name="file" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="hideUploadModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Upload
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        let currentUploadType = '';
+        const assignmentId = '{{ assignment_id }}';
+        
+        function showUploadModal(type) {
+            currentUploadType = type;
+            const modal = document.getElementById('uploadModal');
+            const title = document.getElementById('uploadModalTitle');
+            
+            if (type === 'rubric') {
+                title.textContent = 'Upload Evaluation Rubric';
+            } else {
+                title.textContent = 'Upload Relevant Document';
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function hideUploadModal() {
+            document.getElementById('uploadModal').style.display = 'none';
+            document.getElementById('uploadForm').reset();
+        }
+        
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('fileInput');
+            formData.append('file', fileInput.files[0]);
+            
+            const endpoint = currentUploadType === 'rubric' 
+                ? `/api/assignments/${assignmentId}/rubrics`
+                : `/api/assignments/${assignmentId}/documents`;
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    hideUploadModal();
+                    window.location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Error uploading file: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error uploading file: ' + error.message);
+            }
+        });
+        
+        window.onclick = function(event) {
+            const modal = document.getElementById('uploadModal');
+            if (event.target == modal) {
+                hideUploadModal();
+            }
+        }
+    </script>
+</body>
+</html>

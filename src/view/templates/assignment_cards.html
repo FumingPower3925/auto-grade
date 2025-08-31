@@ -1,0 +1,44 @@
+{% if assignments %}
+    {% for assignment in assignments %}
+    <div class="assignment-card">
+        <div class="assignment-header">
+            <h3 class="assignment-title">
+                <a href="/assignments/{{ assignment.id }}">{{ assignment.name }}</a>
+            </h3>
+            <button class="btn btn-danger btn-small" 
+                    onclick="showDeleteConfirmModal('{{ assignment.id }}')">
+                Delete
+            </button>
+        </div>
+        <div class="assignment-details">
+            <div class="detail-item">
+                <span class="label">Confidence Threshold:</span>
+                <span class="value">{{ "%.2f"|format(assignment.confidence_threshold) }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Rubrics:</span>
+                <span class="value">{{ assignment.evaluation_rubrics|length }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Documents:</span>
+                <span class="value">{{ assignment.relevant_documents|length }}</span>
+            </div>
+            <div class="detail-item">
+                <span class="label">Created:</span>
+                <span class="value">{{ assignment.created_at.strftime('%Y-%m-%d') }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="no-assignments">
+        <p>No assignments found.</p>
+        <p>Click "Create New Assignment" to get started.</p>
+    </div>
+{% endif %}
+
+{% if error %}
+    <div class="error-message">
+        <p>Error loading assignments: {{ error }}</p>
+    </div>
+{% endif %}
