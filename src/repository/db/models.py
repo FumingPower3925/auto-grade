@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator, field_serializer
 from pydantic_core import core_schema
 from bson import ObjectId
-from typing import Any, List
+from typing import Any, List, Optional
 from datetime import datetime, timezone
 
 class PyObjectId(ObjectId):
@@ -57,9 +57,9 @@ class AssignmentModel(BaseModel):
     id: PyObjectId | ObjectId = Field(default_factory=PyObjectId, alias="_id")
     name: str = Field(..., max_length=255)
     confidence_threshold: float = Field(..., ge=0.0, le=1.0)
-    deliverables: List[str] = Field(default_factory=list)
-    evaluation_rubrics: List[PyObjectId | ObjectId] = Field(default_factory=list) # type: ignore
-    relevant_documents: List[PyObjectId | ObjectId] = Field(default_factory=list) # type: ignore
+    deliverables: List[PyObjectId | ObjectId] = Field(default_factory=list)  # type: ignore
+    evaluation_rubrics: List[PyObjectId | ObjectId] = Field(default_factory=list)  # type: ignore
+    relevant_documents: List[PyObjectId | ObjectId] = Field(default_factory=list)  # type: ignore
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -70,7 +70,7 @@ class AssignmentModel(BaseModel):
             raise ValueError("Confidence threshold must be between 0.0 and 1.0")
         return round(v, 2)
 
-    @field_serializer('id', 'evaluation_rubrics', 'relevant_documents')
+    @field_serializer('id', 'evaluation_rubrics', 'relevant_documents', 'deliverables')
     def serialize_objectid(self, value: PyObjectId | ObjectId | List[PyObjectId | ObjectId]) -> str | List[str]:
         if isinstance(value, list):
             return [str(v) for v in value]
@@ -101,6 +101,48 @@ class FileModel(BaseModel):
         return str(value)
     
     @field_serializer('uploaded_at')
+    def serialize_datetime(self, dt: datetime) -> str:
+        return dt.isoformat()
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
+
+
+class DeliverableModel(BaseModel):
+    id: PyObjectId | ObjectId = Field(default_factory=PyObjectId, alias="_id")
+    assignment_id: PyObjectId | ObjectId
+    student_name: str = Field(default="Unknown")
+    mark: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    certainty_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    filename: str
+    content: bytes
+    extension: str
+    content_type: str
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    extracted_text: Optional[str] = Field(default=None)  # Store extracted text for future reference
+
+    @field_validator('mark')
+    @classmethod
+    def validate_mark(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and not 0.0 <= v <= 100.0:
+            raise ValueError("Mark must be between 0.0 and 100.0")
+        return round(v, 2) if v is not None else None
+
+    @field_validator('certainty_threshold')
+    @classmethod
+    def validate_certainty(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and not 0.0 <= v <= 1.0:
+            raise ValueError("Certainty threshold must be between 0.0 and 1.0")
+        return round(v, 2) if v is not None else None
+
+    @field_serializer('id', 'assignment_id')
+    def serialize_objectid(self, value: PyObjectId | ObjectId) -> str:
+        return str(value)
+    
+    @field_serializer('uploaded_at', 'updated_at')
     def serialize_datetime(self, dt: datetime) -> str:
         return dt.isoformat()
 

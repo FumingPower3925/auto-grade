@@ -7,7 +7,7 @@ from pymongo.errors import ConnectionFailure
 from bson import ObjectId
 from config.config import get_config
 from src.repository.db.base import DatabaseRepository
-from src.repository.db.models import DocumentModel, AssignmentModel, FileModel
+from src.repository.db.models import DocumentModel, AssignmentModel, FileModel, DeliverableModel
 
 
 class FerretDBRepository(DatabaseRepository):
@@ -19,6 +19,7 @@ class FerretDBRepository(DatabaseRepository):
         self.collection: Collection[Dict[str, Any]] = self.db["grades"]
         self.assignments_collection: Collection[Dict[str, Any]] = self.db["assignments"]
         self.files_collection: Collection[Dict[str, Any]] = self.db["files"]
+        self.deliverables_collection: Collection[Dict[str, Any]] = self.db["deliverables"]
 
     def health(self) -> bool:
         try:
@@ -85,6 +86,7 @@ class FerretDBRepository(DatabaseRepository):
             obj_id = ObjectId(assignment_id)
             
             self.files_collection.delete_many({"assignment_id": obj_id})
+            self.deliverables_collection.delete_many({"assignment_id": obj_id})
             
             result = self.assignments_collection.delete_one({"_id": obj_id})
             return result.deleted_count > 0
@@ -161,3 +163,94 @@ class FerretDBRepository(DatabaseRepository):
             return files
         except Exception:
             return []
+
+    def store_deliverable(self, assignment_id: str, filename: str, content: bytes,
+                         extension: str, content_type: str, student_name: str = "Unknown",
+                         extracted_text: Optional[str] = None) -> str:
+        try:
+            obj_id = ObjectId(assignment_id)
+            deliverable_data: Dict[str, Any] = {
+                "assignment_id": obj_id,
+                "student_name": student_name,
+                "mark": None,
+                "certainty_threshold": None,
+                "filename": filename,
+                "content": content,
+                "extension": extension,
+                "content_type": content_type,
+                "uploaded_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+                "extracted_text": extracted_text,
+            }
+            result = self.deliverables_collection.insert_one(deliverable_data)
+            deliverable_id = result.inserted_id
+            
+            self.assignments_collection.update_one(
+                {"_id": obj_id},
+                {
+                    "$push": {"deliverables": deliverable_id},
+                    "$set": {"updated_at": datetime.now(timezone.utc)}
+                }
+            )
+            
+            return str(deliverable_id)
+        except Exception:
+            raise
+
+    def get_deliverable(self, deliverable_id: str) -> Optional[DeliverableModel]:
+        try:
+            obj_id = ObjectId(deliverable_id)
+            deliverable = self.deliverables_collection.find_one({"_id": obj_id})
+            if deliverable:
+                return DeliverableModel.model_validate(deliverable)
+            return None
+        except Exception:
+            return None
+
+    def list_deliverables_by_assignment(self, assignment_id: str) -> List[DeliverableModel]:
+        try:
+            obj_id = ObjectId(assignment_id)
+            deliverables: List[DeliverableModel] = []
+            for doc in self.deliverables_collection.find({"assignment_id": obj_id}).sort("uploaded_at", -1):
+                try:
+                    deliverables.append(DeliverableModel.model_validate(doc))
+                except Exception:
+                    continue
+            return deliverables
+        except Exception:
+            return []
+
+    def update_deliverable(self, deliverable_id: str, **kwargs: Any) -> bool:
+        try:
+            obj_id = ObjectId(deliverable_id)
+            
+            kwargs["updated_at"] = datetime.now(timezone.utc)
+            
+            result = self.deliverables_collection.update_one(
+                {"_id": obj_id},
+                {"$set": kwargs}
+            )
+            return result.modified_count > 0
+        except Exception:
+            return False
+
+    def delete_deliverable(self, deliverable_id: str) -> bool:
+        try:
+            obj_id = ObjectId(deliverable_id)
+            
+            deliverable = self.deliverables_collection.find_one({"_id": obj_id})
+            if not deliverable:
+                return False
+            
+            self.assignments_collection.update_one(
+                {"_id": deliverable["assignment_id"]},
+                {
+                    "$pull": {"deliverables": obj_id},
+                    "$set": {"updated_at": datetime.now(timezone.utc)}
+                }
+            )
+            
+            result = self.deliverables_collection.delete_one({"_id": obj_id})
+            return result.deleted_count > 0
+        except Exception:
+            return False
