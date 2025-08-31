@@ -78,13 +78,12 @@ class TestDeliverableServiceCoverageGaps:
 
     @patch('src.service.deliverable_service.get_database_repository')
     def test_line_137_clean_returns_unknown(self, mock_get_repo: MagicMock) -> None:
-        """Test line 137."""
+        """Test line 137 - when all pattern matches return Unknown."""
         service = DeliverableService()
         
-        text = "John Doe\nAssignment"
-        with patch.object(service, 'clean_student_name', side_effect=["Unknown", "Unknown"]):
-            result = service.extract_name_from_text(text)
-            assert result == "Unknown"
+        text = "Name: ###\nSome content"
+        result = service.extract_name_from_text(text)
+        assert result == "Unknown"
 
     @patch('src.service.deliverable_service.get_database_repository')
     def test_lines_175_177_non_pdf(self, mock_get_repo: MagicMock) -> None:

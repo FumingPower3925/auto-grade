@@ -323,3 +323,40 @@ class TestFerretDBDeliverableRepository:
         result = repo.delete_deliverable(str(deliverable_id))
         
         assert result is False
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_list_deliverables_invalid_document(self, mock_mongo_client: MagicMock) -> None:
+        """Test list_deliverables_by_assignment with invalid document (lines 217-218)."""
+        assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
+        
+        deliverables_data: list[Dict[str, Any]] = [
+            {
+                "_id": ObjectId(),
+                "assignment_id": assignment_id,
+                "student_name": "Valid Student",
+                "filename": "valid.pdf",
+                "content": b"content",
+                "extension": "pdf",
+                "content_type": "application/pdf",
+                "uploaded_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            },
+            {
+                "_id": "invalid_objectid",
+                "assignment_id": assignment_id,
+            }
+        ]
+        
+        mock_mongo_client.return_value
+        mock_collection = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__ = MagicMock(return_value=iter(deliverables_data))
+        mock_collection.find.return_value.sort.return_value = mock_cursor
+        
+        repo = FerretDBRepository()
+        repo.deliverables_collection = mock_collection
+        
+        result = repo.list_deliverables_by_assignment(str(assignment_id))
+        
+        assert len(result) == 1
+        assert result[0].student_name == "Valid Student"

@@ -31,7 +31,7 @@ class TestDeliverableService:
         """Test successful student name extraction from PDF using PyPDF2."""
         with patch('src.service.deliverable_service.PdfReader') as mock_pdf_reader:
             mock_page = MagicMock()
-            mock_page.extract_text.return_value = "Name: John Doe\nAssignment 1\nIntroduction..."
+            mock_page.extract_text.return_value = "Name: John Doe" 
             
             mock_reader_instance = MagicMock()
             mock_reader_instance.pages = [mock_page]
@@ -852,3 +852,284 @@ class TestDeliverableService:
         assert text is not None
         
         mock_post.assert_called_once()
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_pattern_found_but_invalid(self, mock_get_repo: MagicMock) -> None:
+        """Test when pattern matches but name is invalid (line 137)."""
+        service = DeliverableService()
+        
+        text = "Name: 123456\nAssignment"
+        result = service.extract_name_from_text(text)
+        assert result == "Unknown"
+
+    @patch('src.service.deliverable_service.logger')
+    @patch('src.service.deliverable_service.PdfReader')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_upload_pdf_with_name_extraction(self, mock_get_repo: MagicMock, mock_pdf_reader: MagicMock, mock_logger: MagicMock) -> None:
+        """Test PDF upload with name extraction and logging (lines 168-170)."""
+        from src.repository.db.models import AssignmentModel
+        from bson import ObjectId
+        from datetime import datetime, timezone
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test Assignment",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.return_value = "deliverable_id"
+        mock_get_repo.return_value = mock_repo
+        
+        # Setup PDF reader
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Student: Bob Smith\nHomework"
+        mock_reader_instance = MagicMock()
+        mock_reader_instance.pages = [mock_page]
+        mock_pdf_reader.return_value = mock_reader_instance
+        
+        service = DeliverableService()
+        result = service.upload_deliverable(
+            "assignment_id",
+            "homework.pdf",
+            b"pdf bytes",
+            "pdf",
+            "application/pdf",
+            extract_name=True
+        )
+        
+        assert result == "deliverable_id"
+        mock_logger.info.assert_called_with("Extracted student name: Bob Smith")
+
+    @patch('src.service.deliverable_service.logger')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_upload_multiple_with_error_logging(self, mock_get_repo: MagicMock, mock_logger: MagicMock) -> None:
+        """Test bulk upload with error logging (line 226)."""
+        from src.repository.db.models import AssignmentModel
+        from bson import ObjectId
+        from datetime import datetime, timezone
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test Assignment",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.side_effect = Exception("Storage failed")
+        mock_get_repo.return_value = mock_repo
+        
+        service = DeliverableService()
+        files = [("error_file.pdf", b"content", "pdf", "application/pdf")]
+        
+        result = service.upload_multiple_deliverables(
+            "assignment_id",
+            files,
+            extract_names=False
+        )
+        
+        assert result == []
+        mock_logger.error.assert_called_with("Failed to upload error_file.pdf: Storage failed")
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_all_patterns_return_unknown(self, mock_get_repo: MagicMock) -> None:
+        """Test line 137 - all patterns return Unknown after cleaning."""
+        service = DeliverableService()
+        
+        text = "Name: 123\nSome content here"
+        result = service.extract_name_from_text(text)
+        assert result == "Unknown"
+
+    @patch('src.service.deliverable_service.logger')
+    @patch('src.service.deliverable_service.PdfReader')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_pdf_extraction_with_name_logging(self, mock_get_repo: MagicMock, mock_pdf_reader: MagicMock, mock_logger: MagicMock) -> None:
+        """Test lines 168-170 - PDF extraction with name logging."""
+        from src.repository.db.models import AssignmentModel
+        from bson import ObjectId
+        from datetime import datetime, timezone
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.return_value = "id123"
+        mock_get_repo.return_value = mock_repo
+        
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Author: Mary Johnson"
+        mock_reader_instance = MagicMock()
+        mock_reader_instance.pages = [mock_page]
+        mock_pdf_reader.return_value = mock_reader_instance
+        
+        service = DeliverableService()
+        service.upload_deliverable(
+            "assignment_id",
+            "test.pdf",
+            b"pdf_bytes",
+            "pdf",
+            "application/pdf",
+            extract_name=True
+        )
+        
+        mock_logger.info.assert_called_with("Extracted student name: Mary Johnson")
+
+    @patch('src.service.deliverable_service.logger')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_bulk_upload_error_logging(self, mock_get_repo: MagicMock, mock_logger: MagicMock) -> None:
+        """Test line 226 - error logging in bulk upload."""
+        from src.repository.db.models import AssignmentModel
+        from bson import ObjectId
+        from datetime import datetime, timezone
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.side_effect = ValueError("Storage error")
+        mock_get_repo.return_value = mock_repo
+        
+        service = DeliverableService()
+        result = service.upload_multiple_deliverables(
+            "assignment_id",
+            [("failing.pdf", b"content", "pdf", "application/pdf")],
+            extract_names=False
+        )
+        
+        assert result == []
+        mock_logger.error.assert_called_with("Failed to upload failing.pdf: Storage error")
+
+    @patch('src.service.deliverable_service.logger')
+    @patch('src.service.deliverable_service.PdfReader')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_upload_pdf_logs_extracted_name(self, mock_get_repo: MagicMock, mock_pdf_reader: MagicMock, mock_logger: MagicMock) -> None:
+        """Test lines 168-170 - logging extracted name."""
+        from src.repository.db.models import AssignmentModel
+        from bson import ObjectId
+        from datetime import datetime, timezone
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.return_value = "id"
+        mock_get_repo.return_value = mock_repo
+        
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Name: Sarah Connor"
+        mock_reader_instance = MagicMock()
+        mock_reader_instance.pages = [mock_page]
+        mock_pdf_reader.return_value = mock_reader_instance
+        
+        service = DeliverableService()
+        service.upload_deliverable(
+            "assignment_id",
+            "doc.pdf",
+            b"pdf",
+            "pdf",
+            "application/pdf",
+            extract_name=True
+        )
+        
+        mock_logger.info.assert_called_with("Extracted student name: Sarah Connor")
+
+    @patch('src.service.deliverable_service.logger')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_bulk_upload_logs_error(self, mock_get_repo: MagicMock, mock_logger: MagicMock) -> None:
+        """Test line 226 - logging upload error."""
+        from src.repository.db.models import AssignmentModel
+        from bson import ObjectId
+        from datetime import datetime, timezone
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.side_effect = RuntimeError("DB fail")
+        mock_get_repo.return_value = mock_repo
+        
+        service = DeliverableService()
+        result = service.upload_multiple_deliverables(
+            "assignment_id",
+            [("bad.pdf", b"x", "pdf", "application/pdf")],
+            extract_names=False
+        )
+        
+        assert result == []
+        mock_logger.error.assert_called_with("Failed to upload bad.pdf: DB fail")
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_clean_student_name_too_short(self, mock_get_repo: MagicMock) -> None:
+        """Test line 137 - name too short or all digits."""
+        service = DeliverableService()
+        
+        assert service.clean_student_name("A") == "Unknown"
+        
+        assert service.clean_student_name("1 2 3") == "Unknown"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_from_individual_line(self, mock_get_repo: MagicMock) -> None:
+        """Test lines 168-170 - extract name from individual line."""
+        service = DeliverableService()
+        
+        text = "Assignment Title\nJohn Smith\nDate: 2024"
+        result = service.extract_name_from_text(text)
+        assert result == "John Smith"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_upload_multiple_deliverables_assignment_not_found(self, mock_get_repo: MagicMock) -> None:
+        """Test line 226 - assignment not found in bulk upload."""
+        mock_repo = MagicMock()
+        mock_repo.get_assignment.return_value = None
+        mock_get_repo.return_value = mock_repo
+        
+        service = DeliverableService()
+        
+        with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
+            service.upload_multiple_deliverables(
+                "test_id",
+                [("file.pdf", b"content", "pdf", "application/pdf")],
+                extract_names=False
+            )

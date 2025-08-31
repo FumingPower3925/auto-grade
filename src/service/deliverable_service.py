@@ -142,22 +142,15 @@ class DeliverableService:
         return name if name else "Unknown"
 
     def extract_name_from_text(self, text: str) -> str:
-        """Extract student name from text using pattern matching.
-        
-        Args:
-            text: The extracted text from the PDF.
-            
-        Returns:
-            The extracted student name or "Unknown".
-        """
+        """Extract student name from text using pattern matching."""
         if not text:
             return "Unknown"
         
         patterns = [
-            r'(?:Name|Student|Author|Submitted by|By|Student Name)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})',
-            r'^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})$',
-            r'^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})\s*\n',
-            r'(?:Prepared by|Written by|Created by)[\s:]*([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})',
+            r'(?:Name|Student|Author|Submitted by|By|Student Name)[\s:]*([A-Z][a-zA-Z]+(?:[ \t]+[A-Z][a-zA-Z]+){1,3})',
+            r'^([A-Z][a-zA-Z]+(?:[ \t]+[A-Z][a-zA-Z]+){1,3})$',
+            r'^([A-Z][a-zA-Z]+(?:[ \t]+[A-Z][a-zA-Z]+){1,3})[ \t]*\n',
+            r'(?:Prepared by|Written by|Created by)[\s:]*([A-Z][a-zA-Z]+(?:[ \t]+[A-Z][a-zA-Z]+){1,3})',
         ]
         
         for pattern in patterns:
@@ -171,11 +164,11 @@ class DeliverableService:
         lines = text.split('\n')[:10]
         for line in lines:
             line = line.strip()
-            if re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}$', line):
+            if re.match(r'^[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+){1,3}$', line):
                 cleaned_name = self.clean_student_name(line)
                 if cleaned_name != "Unknown":
                     return cleaned_name
-                
+                    
         return "Unknown"
     
     def upload_deliverable(self, assignment_id: str, filename: str, content: bytes,
