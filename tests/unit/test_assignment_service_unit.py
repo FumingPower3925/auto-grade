@@ -289,3 +289,15 @@ class TestAssignmentService:
         assert result == mock_files
         assert len(result) == 1
         mock_repo.list_files_by_assignment.assert_called_once_with("assignment_id", "relevant_document")
+
+    @patch('src.service.assignment_service.get_database_repository')
+    def test_upload_relevant_document_assignment_not_found(self, mock_get_repo: MagicMock) -> None:
+        """Test relevant document upload when assignment doesn't exist."""
+        mock_repo = MagicMock()
+        mock_repo.get_assignment.return_value = None
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        
+        with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
+            service.upload_relevant_document("test_id", "doc.pdf", b"content", "application/pdf")

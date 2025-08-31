@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from fastapi import status
 from typing import Dict, Any
 from httpx import Response
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from src.controller.api.api import app
 from src.controller.api.models import HealthResponse
@@ -168,3 +168,94 @@ class TestAPIRouteConfiguration:
         """Test that nonexistent routes return 404."""
         response: Response = self.client.get("/nonexistent")
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @patch('src.service.assignment_service.AssignmentService.create_assignment', side_effect=Exception("Database error"))
+    def test_create_assignment_exception(self, mock_create_assignment: MagicMock) -> None:
+        """Test exception handling for create_assignment."""
+        assignment_data: Dict[str, Any] = {
+            "name": "Test Assignment",
+            "confidence_threshold": 0.85
+        }
+        response: Response = self.client.post("/assignments", json=assignment_data)
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to create assignment"
+
+    @patch('src.service.assignment_service.AssignmentService.get_assignment', side_effect=Exception("Database error"))
+    def test_get_assignment_exception(self, mock_get_assignment: MagicMock) -> None:
+        """Test exception handling for get_assignment."""
+        response: Response = self.client.get("/assignments/some_id")
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to get assignment"
+
+    @patch('src.service.assignment_service.AssignmentService.list_assignments', side_effect=Exception("Database error"))
+    def test_list_assignments_exception(self, mock_list_assignments: MagicMock) -> None:
+        """Test exception handling for list_assignments."""
+        response: Response = self.client.get("/assignments")
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to list assignments"
+
+    @patch('src.service.assignment_service.AssignmentService.delete_assignment', side_effect=Exception("Database error"))
+    def test_delete_assignment_exception(self, mock_delete_assignment: MagicMock) -> None:
+        """Test exception handling for delete_assignment."""
+        response: Response = self.client.delete("/assignments/some_id")
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to delete assignment"
+
+    @patch('src.service.assignment_service.AssignmentService.upload_rubric', side_effect=Exception("Upload error"))
+    def test_upload_rubric_exception(self, mock_upload_rubric: MagicMock) -> None:
+        """Test exception handling for upload_rubric."""
+        response: Response = self.client.post("/assignments/some_id/rubrics", files={"file": ("test.txt", b"content", "text/plain")})
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to upload rubric"
+
+    @patch('src.service.assignment_service.AssignmentService.upload_relevant_document', side_effect=Exception("Upload error"))
+    def test_upload_relevant_document_exception(self, mock_upload_relevant_document: MagicMock) -> None:
+        """Test exception handling for upload_relevant_document."""
+        response: Response = self.client.post("/assignments/some_id/documents", files={"file": ("test.txt", b"content", "text/plain")})
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to upload document"
+
+    @patch('src.service.assignment_service.AssignmentService.get_file', side_effect=Exception("Download error"))
+    def test_download_file_exception(self, mock_get_file: MagicMock) -> None:
+        """Test exception handling for download_file."""
+        response: Response = self.client.get("/files/some_id")
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to download file"
+
+    @patch('src.controller.api.api.AssignmentService.get_assignment', return_value=None)
+    def test_create_assignment_retrieval_failure(self, mock_get_assignment: MagicMock) -> None:
+        """Test the case where the assignment is not found after creation."""
+        with patch('src.controller.api.api.AssignmentService.create_assignment', return_value="new_id"):
+            response = self.client.post("/assignments", json={"name": "test", "confidence_threshold": 0.5})
+            assert response.status_code == 500
+            assert response.json()["detail"] == "Failed to retrieve created assignment"
+
+    @patch('src.controller.api.api.AssignmentService.get_file', return_value=None)
+    def test_download_file_not_found_exception(self, mock_get_file: MagicMock) -> None:
+        """Test the case where the file is not found for download."""
+        response = self.client.get("/files/non_existent_id")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "File not found"
+
+    @patch('src.service.assignment_service.AssignmentService.upload_relevant_document')
+    def test_upload_document_no_filename(self, mock_upload_document: MagicMock) -> None:
+        """Test uploading a document with no filename."""
+        mock_upload_document.return_value = "file_id_123"
+        
+        file_content = b"some content"
+        response = self.client.post(
+            "/assignments/some_id/documents",
+            files={"file": (None, file_content, "application/octet-stream")}
+        )
+        assert response.status_code == 422
+
+    @patch('src.service.assignment_service.AssignmentService.upload_relevant_document', side_effect=ValueError("Assignment not found"))
+    def test_upload_document_value_error(self, mock_upload_document: MagicMock) -> None:
+        """Test ValueError handling for upload_relevant_document."""
+        file_content = b"some content"
+        response = self.client.post(
+            "/assignments/some_id/documents",
+            files={"file": ("test.txt", file_content, "text/plain")}
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Assignment not found"

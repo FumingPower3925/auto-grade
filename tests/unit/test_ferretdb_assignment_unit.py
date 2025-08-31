@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from typing import Dict, Any
 
+import pytest
+
 from src.repository.db.ferretdb.repository import FerretDBRepository
 from src.repository.db.models import AssignmentModel, FileModel
 
@@ -29,7 +31,6 @@ class TestFerretDBAssignmentRepository:
         
         assert result == "60c72b2f9b1d8e2a1c9d4b7f"
         
-        # Verify the data passed to insert_one
         call_args = mock_collection.insert_one.call_args[0][0]
         assert call_args["name"] == "Test Assignment"
         assert call_args["confidence_threshold"] == 0.75
@@ -189,7 +190,6 @@ class TestFerretDBAssignmentRepository:
         
         assert result is True
         
-        # Verify update_one was called correctly
         call_args = mock_collection.update_one.call_args
         assert call_args[0][0] == {"_id": assignment_id}
         update_doc = call_args[0][1]["$set"]
@@ -225,7 +225,6 @@ class TestFerretDBAssignmentRepository:
         
         assert result == str(file_id)
         
-        # Verify file was inserted
         file_call_args = mock_files_collection.insert_one.call_args[0][0]
         assert file_call_args["assignment_id"] == assignment_id
         assert file_call_args["filename"] == "rubric.pdf"
@@ -233,7 +232,6 @@ class TestFerretDBAssignmentRepository:
         assert file_call_args["content_type"] == "application/pdf"
         assert file_call_args["file_type"] == "rubric"
         
-        # Verify assignment was updated
         mock_assignments_collection.update_one.assert_called_once_with(
             {"_id": assignment_id},
             {"$push": {"evaluation_rubrics": file_id}}
@@ -267,7 +265,6 @@ class TestFerretDBAssignmentRepository:
         
         assert result == str(file_id)
         
-        # Verify assignment was updated with relevant_documents
         mock_assignments_collection.update_one.assert_called_once_with(
             {"_id": assignment_id},
             {"$push": {"relevant_documents": file_id}}
@@ -346,3 +343,73 @@ class TestFerretDBAssignmentRepository:
             "assignment_id": assignment_id,
             "file_type": "rubric"
         })
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_get_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+        """Test get_assignment with an exception."""
+        repo = FerretDBRepository()
+        repo.assignments_collection = MagicMock()
+        repo.assignments_collection.find_one.side_effect = Exception("DB error")
+        assert repo.get_assignment("60c72b2f9b1d8e2a1c9d4b7f") is None
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_list_assignments_exception(self, mock_mongo_client: MagicMock) -> None:
+        """Test list_assignments with an exception during iteration."""
+        repo = FerretDBRepository()
+        repo.assignments_collection = MagicMock()
+        repo.assignments_collection.find.return_value.sort.return_value = [Exception("DB error")]
+        assert repo.list_assignments() == []
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_delete_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+        """Test delete_assignment with an exception."""
+        repo = FerretDBRepository()
+        repo.assignments_collection = MagicMock()
+        repo.assignments_collection.delete_one.side_effect = Exception("DB error")
+        assert repo.delete_assignment("60c72b2f9b1d8e2a1c9d4b7f") is False
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_update_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+        """Test update_assignment with an exception."""
+        repo = FerretDBRepository()
+        repo.assignments_collection = MagicMock()
+        repo.assignments_collection.update_one.side_effect = Exception("DB error")
+        assert repo.update_assignment("60c72b2f9b1d8e2a1c9d4b7f") is False
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_store_file_exception(self, mock_mongo_client: MagicMock) -> None:
+        """Test store_file with an exception."""
+        repo = FerretDBRepository()
+        repo.files_collection = MagicMock()
+        repo.files_collection.insert_one.side_effect = Exception("DB error")
+        with pytest.raises(Exception):
+            repo.store_file("60c72b2f9b1d8e2a1c9d4b7f", "test.txt", b"test", "text/plain", "rubric")
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_get_file_exception(self, mock_mongo_client: MagicMock) -> None:
+        """Test get_file with an exception."""
+        repo = FerretDBRepository()
+        repo.files_collection = MagicMock()
+        repo.files_collection.find_one.side_effect = Exception("DB error")
+        assert repo.get_file("50c72b2f9b1d8e2a1c9d4b7f") is None
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_list_files_by_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+        """Test list_files_by_assignment with an exception."""
+        repo = FerretDBRepository()
+        repo.files_collection = MagicMock()
+        repo.files_collection.find.side_effect = Exception("DB error")
+        assert repo.list_files_by_assignment("60c72b2f9b1d8e2a1c9d4b7f") == []
+
+    def test_list_files_by_assignment_invalid_id(self) -> None:
+        """Test list_files_by_assignment with an invalid assignment ID."""
+        repo = FerretDBRepository()
+        assert repo.list_files_by_assignment("invalid-id") == []
+
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_list_files_by_assignment_validation_error(self, mock_mongo_client: MagicMock) -> None:
+        """Test list_files_by_assignment with a validation error."""
+        repo = FerretDBRepository()
+        repo.files_collection = MagicMock()
+        repo.files_collection.find.return_value.sort.return_value = [{"_id": "invalid"}]
+        assert repo.list_files_by_assignment("60c72b2f9b1d8e2a1c9d4b7f") == []
