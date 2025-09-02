@@ -67,7 +67,7 @@ async def create_assignment(request: CreateAssignmentRequest) -> AssignmentRespo
             id=str(assignment.id),
             name=assignment.name,
             confidence_threshold=assignment.confidence_threshold,
-            deliverables=assignment.deliverables,  # type: ignore
+            deliverables=[str(d) for d in assignment.deliverables],  # type: ignore
             evaluation_rubrics_count=len(assignment.evaluation_rubrics),
             relevant_documents_count=len(assignment.relevant_documents),
             created_at=assignment.created_at.isoformat(),
@@ -94,7 +94,7 @@ async def list_assignments() -> AssignmentListResponse:
                 id=str(assignment.id),
                 name=assignment.name,
                 confidence_threshold=assignment.confidence_threshold,
-                deliverables=assignment.deliverables,  # type: ignore
+                deliverables=[str(d) for d in assignment.deliverables],  # type: ignore
                 evaluation_rubrics_count=len(assignment.evaluation_rubrics),
                 relevant_documents_count=len(assignment.relevant_documents),
                 created_at=assignment.created_at.isoformat(),
@@ -150,7 +150,7 @@ async def get_assignment(assignment_id: str) -> AssignmentDetailResponse:
             id=str(assignment.id),
             name=assignment.name,
             confidence_threshold=assignment.confidence_threshold,
-            deliverables=assignment.deliverables,  # type: ignore
+            deliverables=[str(d) for d in assignment.deliverables],  # type: ignore
             deliverables_count=len(assignment.deliverables),
             evaluation_rubrics=rubric_infos,
             relevant_documents=document_infos,
