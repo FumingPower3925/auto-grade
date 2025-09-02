@@ -295,7 +295,7 @@ class TestDeliverableE2E:
                     headers: {{'Content-Type': 'application/json'}},
                     body: JSON.stringify({{
                         student_name: 'Test Student',
-                        mark: 85.5,
+                        mark: 8.55,
                         certainty_threshold: 0.95
                     }})
                 }});
@@ -323,7 +323,7 @@ class TestDeliverableE2E:
             expect(card).to_contain_text("Marked")
             
             # Check mark
-            expect(card).to_contain_text("85.50")
+            expect(card).to_contain_text("8.55")
             
             # Check certainty
             expect(card).to_contain_text("95%")

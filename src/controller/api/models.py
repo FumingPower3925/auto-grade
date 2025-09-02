@@ -75,7 +75,7 @@ class BulkDeliverableUploadResponse(BaseModel):
 
 class UpdateDeliverableRequest(BaseModel):
     student_name: Optional[str] = Field(None, max_length=255, description="Student name")
-    mark: Optional[float] = Field(None, ge=0.0, le=100.0, description="Mark between 0 and 100")
+    mark: Optional[float] = Field(None, ge=0.0, le=10.0, description="Mark between 0 and 100")
     certainty_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Certainty threshold between 0.0 and 1.0")
 
 

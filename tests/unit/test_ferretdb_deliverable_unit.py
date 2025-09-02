@@ -86,7 +86,7 @@ class TestFerretDBDeliverableRepository:
             "_id": deliverable_id,
             "assignment_id": ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
             "student_name": "Jane Smith",
-            "mark": 85.5,
+            "mark": 8.55,
             "certainty_threshold": 0.95,
             "filename": "assignment.pdf",
             "gridfs_id": gridfs_id,
@@ -117,7 +117,7 @@ class TestFerretDBDeliverableRepository:
         
         assert isinstance(result, DeliverableModel)
         assert result.student_name == "Jane Smith"
-        assert result.mark == 85.5
+        assert result.mark == 8.55
         assert result.certainty_threshold == 0.95
         assert result.filename == "assignment.pdf"
         assert result.content == b"pdf content"
@@ -166,7 +166,7 @@ class TestFerretDBDeliverableRepository:
                 "_id": ObjectId(),
                 "assignment_id": assignment_id,
                 "student_name": "Student 2",
-                "mark": 90.0,
+                "mark": 9.0,
                 "certainty_threshold": 0.85,
                 "filename": "submission2.pdf",
                 "gridfs_id": ObjectId(),
@@ -196,7 +196,7 @@ class TestFerretDBDeliverableRepository:
         assert all(isinstance(d, DeliverableModel) for d in result)
         assert result[0].student_name == "Student 1"
         assert result[1].student_name == "Student 2"
-        assert result[1].mark == 90.0
+        assert result[1].mark == 9.0
         
         mock_collection.find.assert_called_once_with({"assignment_id": assignment_id})
 
@@ -222,7 +222,7 @@ class TestFerretDBDeliverableRepository:
         result = repo.update_deliverable(
             str(deliverable_id),
             student_name="Updated Name",
-            mark=75.5,
+            mark=7.55,
             certainty_threshold=0.80
         )
         
@@ -232,7 +232,7 @@ class TestFerretDBDeliverableRepository:
         assert call_args[0][0] == {"_id": deliverable_id}
         update_doc = call_args[0][1]["$set"]
         assert update_doc["student_name"] == "Updated Name"
-        assert update_doc["mark"] == 75.5
+        assert update_doc["mark"] == 7.55
         assert update_doc["certainty_threshold"] == 0.80
         assert isinstance(update_doc["updated_at"], datetime)
 
@@ -469,7 +469,7 @@ class TestFerretDBDeliverableRepository:
             "_id": deliverable_id,
             "assignment_id": ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
             "student_name": "Test Student",
-            "mark": 90.0,
+            "mark": 9.0,
             "certainty_threshold": 0.85,
             "filename": "test.pdf",
             "content": b"inline content",

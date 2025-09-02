@@ -260,8 +260,8 @@ class DeliverableService:
             update_data["student_name"] = student_name
         
         if mark is not None:
-            if not 0.0 <= mark <= 100.0:
-                raise ValueError("Mark must be between 0.0 and 100.0")
+            if not 0.0 <= mark <= 10.0:
+                raise ValueError("Mark must be between 0.0 and 10.0")
             update_data["mark"] = round(mark, 2)
         
         if certainty_threshold is not None:

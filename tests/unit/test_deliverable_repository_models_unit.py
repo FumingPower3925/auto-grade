@@ -20,7 +20,7 @@ class TestDeliverableModel:
             _id=deliverable_id,
             assignment_id=assignment_id,
             student_name="John Doe",
-            mark=85.5,
+            mark=8.55,
             certainty_threshold=0.95,
             filename="submission.pdf",
             content=b"PDF content",
@@ -34,7 +34,7 @@ class TestDeliverableModel:
         assert deliverable.id == deliverable_id
         assert deliverable.assignment_id == assignment_id
         assert deliverable.student_name == "John Doe"
-        assert deliverable.mark == 85.5
+        assert deliverable.mark == 8.55
         assert deliverable.certainty_threshold == 0.95
         assert deliverable.filename == "submission.pdf"
         assert deliverable.content == b"PDF content"
@@ -64,26 +64,26 @@ class TestDeliverableModel:
     def test_mark_validation_valid(self) -> None:
         """Test valid mark values."""
         assert DeliverableModel.validate_mark(0.0) == 0.0
-        assert DeliverableModel.validate_mark(100.0) == 100.0
-        assert DeliverableModel.validate_mark(50.0) == 50.0
-        
-        assert DeliverableModel.validate_mark(85.556) == 85.56
-        assert DeliverableModel.validate_mark(92.111) == 92.11
+        assert DeliverableModel.validate_mark(10.0) == 10.0
+        assert DeliverableModel.validate_mark(5.0) == 5.0
+
+        assert DeliverableModel.validate_mark(8.556) == 8.56
+        assert DeliverableModel.validate_mark(9.111) == 9.11
         
         assert DeliverableModel.validate_mark(None) is None
 
     def test_mark_validation_invalid(self) -> None:
         """Test invalid mark values."""
-        with pytest.raises(ValueError, match="Mark must be between 0.0 and 100.0"):
+        with pytest.raises(ValueError, match="Mark must be between 0.0 and 10.0"):
             DeliverableModel.validate_mark(-0.1)
         
-        with pytest.raises(ValueError, match="Mark must be between 0.0 and 100.0"):
-            DeliverableModel.validate_mark(100.1)
+        with pytest.raises(ValueError, match="Mark must be between 0.0 and 10.0"):
+            DeliverableModel.validate_mark(10.1)
         
-        with pytest.raises(ValueError, match="Mark must be between 0.0 and 100.0"):
-            DeliverableModel.validate_mark(150.0)
+        with pytest.raises(ValueError, match="Mark must be between 0.0 and 10.0"):
+            DeliverableModel.validate_mark(15.0)
         
-        with pytest.raises(ValueError, match="Mark must be between 0.0 and 100.0"):
+        with pytest.raises(ValueError, match="Mark must be between 0.0 and 10.0"):
             DeliverableModel.validate_mark(-10.0)
 
     def test_certainty_threshold_validation_valid(self) -> None:
@@ -157,7 +157,7 @@ class TestDeliverableModel:
             "_id": deliverable_id,
             "assignment_id": assignment_id,
             "student_name": "Jane Smith",
-            "mark": 90.0,
+            "mark": 9.0,
             "certainty_threshold": 0.85,
             "filename": "homework.pdf",
             "content": b"PDF content here",
@@ -173,7 +173,7 @@ class TestDeliverableModel:
         assert deliverable.id == deliverable_id
         assert deliverable.assignment_id == assignment_id
         assert deliverable.student_name == "Jane Smith"
-        assert deliverable.mark == 90.0
+        assert deliverable.mark == 9.0
         assert deliverable.certainty_threshold == 0.85
         assert deliverable.filename == "homework.pdf"
 
@@ -204,7 +204,7 @@ class TestDeliverableModel:
             "content": b"content",
             "extension": "pdf",
             "content_type": "application/pdf",
-            "mark": 150.0
+            "mark": 15.0
         }
         
         with pytest.raises(ValidationError) as exc_info:
@@ -247,7 +247,7 @@ class TestDeliverableModel:
         original = DeliverableModel(
             assignment_id=ObjectId(),
             student_name="Original Name",
-            mark=75.0,
+            mark=7.50,
             filename="test.pdf",
             content=b"content",
             extension="pdf",
@@ -256,12 +256,12 @@ class TestDeliverableModel:
         
         updated = original.model_copy(update={
             "student_name": "Updated Name",
-            "mark": 85.0,
+            "mark": 8.5,
             "certainty_threshold": 0.90
         })
         
         assert updated.student_name == "Updated Name"
-        assert updated.mark == 85.0
+        assert updated.mark == 8.5
         assert updated.certainty_threshold == 0.90
         assert updated.filename == original.filename
         assert updated.assignment_id == original.assignment_id
@@ -271,7 +271,7 @@ class TestDeliverableModel:
         deliverable = DeliverableModel(
             assignment_id=ObjectId(),
             student_name="Test Student",
-            mark=88.5,
+            mark=8.85,
             certainty_threshold=0.92,
             filename="submission.pdf",
             content=b"PDF content",
@@ -284,7 +284,7 @@ class TestDeliverableModel:
         
         assert "student_name" in json_str
         assert "Test Student" in json_str
-        assert "88.5" in json_str
+        assert "8.85" in json_str
         assert "0.92" in json_str
 
     def test_model_with_null_optional_fields(self) -> None:

@@ -193,7 +193,7 @@ class TestDeliverableEndpoints:
                 _id=ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
                 assignment_id=ObjectId("50c72b2f9b1d8e2a1c9d4b7f"),
                 student_name="John Doe",
-                mark=85.5,
+                mark=8.55,
                 certainty_threshold=0.95,
                 filename="submission1.pdf",
                 content=b"content1",
@@ -227,7 +227,7 @@ class TestDeliverableEndpoints:
         assert len(data["deliverables"]) == 2
         
         assert data["deliverables"][0]["student_name"] == "John Doe"
-        assert data["deliverables"][0]["mark"] == 85.5
+        assert data["deliverables"][0]["mark"] == 8.55
         assert data["deliverables"][0]["mark_status"] == "Marked"
         assert data["deliverables"][0]["certainty_threshold"] == 0.95
         
@@ -258,7 +258,7 @@ class TestDeliverableEndpoints:
             _id=ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
             assignment_id=ObjectId("50c72b2f9b1d8e2a1c9d4b7f"),
             student_name="Updated Name",
-            mark=90.0,
+            mark=9.0,
             certainty_threshold=0.85,
             filename="submission.pdf",
             content=b"content",
@@ -272,7 +272,7 @@ class TestDeliverableEndpoints:
         
         update_data: Dict[str, Any] = {
             "student_name": "Updated Name",
-            "mark": 90.0,
+            "mark": 9.0,
             "certainty_threshold": 0.85
         }
         
@@ -281,7 +281,7 @@ class TestDeliverableEndpoints:
         assert response.status_code == status.HTTP_200_OK
         data: Dict[str, Any] = response.json()
         assert data["student_name"] == "Updated Name"
-        assert data["mark"] == 90.0
+        assert data["mark"] == 9.0
         assert data["mark_status"] == "Marked"
         assert data["certainty_threshold"] == 0.85
 
@@ -305,13 +305,13 @@ class TestDeliverableEndpoints:
         mock_service = MagicMock()
         mock_service_class.return_value = mock_service
         
-        update_data = {"mark": 150.0}
+        update_data = {"mark": 15.0}
         
         response: Response = self.client.patch("/deliverables/deliverable_id", json=update_data)
         
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         errors = response.json()["detail"]
-        assert any("less than or equal to 100" in str(error.get("msg", "")) for error in errors)
+        assert any("less than or equal to 10" in str(error.get("msg", "")) for error in errors)
 
     @patch('src.controller.api.api.DeliverableService')
     def test_delete_deliverable_success(self, mock_service_class: MagicMock) -> None:

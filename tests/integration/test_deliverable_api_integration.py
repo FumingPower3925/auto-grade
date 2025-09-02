@@ -69,7 +69,7 @@ class TestDeliverableAPIIntegration:
         
         update_data: Dict[str, Any] = {
             "student_name": "John Doe",
-            "mark": 85.5,
+            "mark": 8.55,
             "certainty_threshold": 0.95
         }
         update_response: Response = self.client.patch(
@@ -80,7 +80,7 @@ class TestDeliverableAPIIntegration:
         assert update_response.status_code == status.HTTP_200_OK
         updated_deliverable: Dict[str, Any] = update_response.json()
         assert updated_deliverable["student_name"] == "John Doe"
-        assert updated_deliverable["mark"] == 85.5
+        assert updated_deliverable["mark"] == 8.55
         assert updated_deliverable["mark_status"] == "Marked"
         assert updated_deliverable["certainty_threshold"] == 0.95
         
@@ -214,13 +214,13 @@ class TestDeliverableAPIIntegration:
         # Update only mark
         update_response = self.client.patch(
             f"/deliverables/{deliverable['id']}",
-            json={"mark": 92.0}
+            json={"mark": 9.2}
         )
         
         assert update_response.status_code == status.HTTP_200_OK
         updated = update_response.json()
         assert updated["student_name"] == "Jane Smith"  # Should retain previous update
-        assert updated["mark"] == 92.0
+        assert updated["mark"] == 9.2
         assert updated["mark_status"] == "Marked"
 
     def test_assignment_with_deliverables_deletion(self) -> None:
@@ -290,7 +290,7 @@ class TestDeliverableAPIIntegration:
         
         update_response = self.client.patch(
             f"/deliverables/{deliverable['id']}",
-            json={"mark": 100.0}
+            json={"mark": 10.0}
         )
         assert update_response.status_code == status.HTTP_200_OK
         
@@ -303,7 +303,7 @@ class TestDeliverableAPIIntegration:
         
         update_response = self.client.patch(
             f"/deliverables/{deliverable['id']}",
-            json={"mark": 100.1}
+            json={"mark": 10.1}
         )
         assert update_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 

@@ -296,7 +296,7 @@ class TestDeliverableService:
         result = service.update_deliverable(
             "deliverable_id",
             student_name="Updated Name",
-            mark=85.5,
+            mark=8.55,
             certainty_threshold=0.95
         )
         
@@ -304,7 +304,7 @@ class TestDeliverableService:
         mock_repo.update_deliverable.assert_called_once_with(
             "deliverable_id",
             student_name="Updated Name",
-            mark=85.5,
+            mark=8.55,
             certainty_threshold=0.95
         )
 
@@ -330,10 +330,10 @@ class TestDeliverableService:
         
         service = DeliverableService()
         
-        with pytest.raises(ValueError, match="Mark must be between 0.0 and 100.0"):
-            service.update_deliverable("deliverable_id", mark=150.0)
+        with pytest.raises(ValueError, match="Mark must be between 0.0 and 10.0"):
+            service.update_deliverable("deliverable_id", mark=15.0)
         
-        with pytest.raises(ValueError, match="Mark must be between 0.0 and 100.0"):
+        with pytest.raises(ValueError, match="Mark must be between 0.0 and 10.0"):
             service.update_deliverable("deliverable_id", mark=-10.0)
 
     @patch('src.service.deliverable_service.get_database_repository')
@@ -411,7 +411,7 @@ class TestDeliverableService:
             _id=ObjectId(),
             assignment_id=ObjectId(),
             student_name="Test Student",
-            mark=90.0,
+            mark=9.0,
             certainty_threshold=0.85,
             filename="test.pdf",
             content=b"content",
@@ -438,7 +438,7 @@ class TestDeliverableService:
                 _id=ObjectId(),
                 assignment_id=ObjectId(),
                 student_name="Student 1",
-                mark=80.0,
+                mark=8.0,
                 certainty_threshold=0.75,
                 filename="submission1.pdf",
                 content=b"content1",

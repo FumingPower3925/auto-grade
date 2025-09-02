@@ -114,7 +114,7 @@ class DeliverableModel(BaseModel):
     id: PyObjectId | ObjectId = Field(default_factory=PyObjectId, alias="_id")
     assignment_id: PyObjectId | ObjectId
     student_name: str = Field(default="Unknown")
-    mark: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    mark: Optional[float] = Field(default=None, ge=0.0, le=10.0)
     certainty_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     filename: str
     content: bytes
@@ -127,8 +127,8 @@ class DeliverableModel(BaseModel):
     @field_validator('mark')
     @classmethod
     def validate_mark(cls, v: Optional[float]) -> Optional[float]:
-        if v is not None and not 0.0 <= v <= 100.0:
-            raise ValueError("Mark must be between 0.0 and 100.0")
+        if v is not None and not 0.0 <= v <= 10.0:
+            raise ValueError("Mark must be between 0.0 and 10.0")
         return round(v, 2) if v is not None else None
 
     @field_validator('certainty_threshold')
