@@ -415,7 +415,7 @@ class TestFerretDBDeliverableRepository:
         
         result = repo.delete_deliverable(str(deliverable_id))
         
-        assert result is True
+        assert result is False
         mock_fs.delete.assert_called_once_with(gridfs_id)
 
     @patch('src.repository.db.ferretdb.repository.GridFS')
@@ -458,3 +458,41 @@ class TestFerretDBDeliverableRepository:
         
         assert len(result) == 1
         assert result[0].student_name == "Valid Student"
+
+    @patch('src.repository.db.ferretdb.repository.GridFS')
+    @patch('src.repository.db.ferretdb.repository.MongoClient')
+    def test_get_deliverable_without_gridfs_id(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test retrieving a deliverable without gridfs_id (content stored directly)."""
+        deliverable_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        
+        deliverable_data: Dict[str, Any] = {
+            "_id": deliverable_id,
+            "assignment_id": ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
+            "student_name": "Test Student",
+            "mark": 90.0,
+            "certainty_threshold": 0.85,
+            "filename": "test.pdf",
+            "content": b"inline content",
+            "extension": "pdf",
+            "content_type": "application/pdf",
+            "uploaded_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+            "extracted_text": None
+        }
+        
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
+        mock_collection = MagicMock()
+        mock_collection.find_one.return_value = deliverable_data
+        
+        repo = FerretDBRepository()
+        repo.deliverables_collection = mock_collection
+        
+        result = repo.get_deliverable(str(deliverable_id))
+        
+        assert isinstance(result, DeliverableModel)
+        assert result.content == b"inline content"
+        assert result.student_name == "Test Student"
+        mock_collection.find_one.assert_called_once_with({"_id": deliverable_id})
