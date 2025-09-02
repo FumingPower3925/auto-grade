@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, status, Form
 from fastapi.responses import StreamingResponse
-from typing import List
+from typing import List, Optional
 import io
 import datetime as datetime
 from src.controller.api.models import (
@@ -264,44 +264,42 @@ async def upload_deliverable(
     assignment_id: str,
     file: UploadFile = File(...),
     extract_name: bool = Form(default=True)
-) -> DeliverableUploadResponse:
+) -> Optional[DeliverableUploadResponse]:
     """Upload a single deliverable for an assignment."""
     deliverable_service = DeliverableService()
     
     try:
-        if not file.filename:
-            raise HTTPException(status_code=422, detail="Filename is required")
+        if file.filename:
+            is_valid, error_msg = deliverable_service.validate_file_format(
+                file.filename, 
+                file.content_type or "application/octet-stream"
+            )
+            if not is_valid:
+                raise HTTPException(status_code=422, detail=error_msg)
+            
+            content = await file.read()
+            extension = file.filename.split(".")[-1] if "." in file.filename else ""
+            
+            deliverable_id = deliverable_service.upload_deliverable(
+                assignment_id=assignment_id,
+                filename=file.filename,
+                content=content,
+                extension=extension,
+                content_type=file.content_type or "application/octet-stream",
+                extract_name=extract_name
+            )
         
-        is_valid, error_msg = deliverable_service.validate_file_format(
-            file.filename, 
-            file.content_type or "application/octet-stream"
-        )
-        if not is_valid:
-            raise HTTPException(status_code=422, detail=error_msg)
-        
-        content = await file.read()
-        extension = file.filename.split(".")[-1] if "." in file.filename else ""
-        
-        deliverable_id = deliverable_service.upload_deliverable(
-            assignment_id=assignment_id,
-            filename=file.filename,
-            content=content,
-            extension=extension,
-            content_type=file.content_type or "application/octet-stream",
-            extract_name=extract_name
-        )
-        
-        deliverable = deliverable_service.get_deliverable(deliverable_id)
-        if not deliverable:
-            raise HTTPException(status_code=500, detail="Failed to retrieve uploaded deliverable")
-        
-        return DeliverableUploadResponse(
-            id=deliverable_id,
-            filename=deliverable.filename,
-            student_name=deliverable.student_name,
-            uploaded_at=deliverable.uploaded_at.isoformat(),
-            message="Deliverable uploaded successfully"
-        )
+            deliverable = deliverable_service.get_deliverable(deliverable_id)
+            if not deliverable:
+                raise HTTPException(status_code=500, detail="Failed to retrieve uploaded deliverable")
+            
+            return DeliverableUploadResponse(
+                id=deliverable_id,
+                filename=deliverable.filename,
+                student_name=deliverable.student_name,
+                uploaded_at=deliverable.uploaded_at.isoformat(),
+                message="Deliverable uploaded successfully"
+            )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except HTTPException:
@@ -324,24 +322,22 @@ async def upload_multiple_deliverables(
         files_data: List[tuple[str, bytes, str, str]] = []
         
         for file in files:
-            if not file.filename:
-                continue
-
-            is_valid, error_msg = deliverable_service.validate_file_format( # type: ignore
-                file.filename,
-                file.content_type or "application/octet-stream"
-            )
-            if not is_valid:
-                continue
-            
-            content = await file.read()
-            extension = file.filename.split(".")[-1] if "." in file.filename else ""
-            files_data.append((
-                file.filename,
-                content,
-                extension,
-                file.content_type or "application/octet-stream"
-            ))
+            if file.filename:
+                is_valid, error_msg = deliverable_service.validate_file_format( # type: ignore
+                    file.filename,
+                    file.content_type or "application/octet-stream"
+                )
+                if not is_valid:
+                    continue
+                
+                content = await file.read()
+                extension = file.filename.split(".")[-1] if "." in file.filename else ""
+                files_data.append((
+                    file.filename,
+                    content,
+                    extension,
+                    file.content_type or "application/octet-stream"
+                ))
         
         if not files_data:
             raise HTTPException(status_code=422, detail="No valid files provided")

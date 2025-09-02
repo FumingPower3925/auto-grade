@@ -371,10 +371,16 @@
             uploadBtn.textContent = 'Uploading...';
             
             const formData = new FormData();
-            selectedDeliverableFiles.forEach(file => {
-                formData.append('files', file);
-            });
-            formData.append('extract_names', document.getElementById('extractNames').checked);
+            
+            if (selectedDeliverableFiles.length === 1) {
+                formData.append('file', selectedDeliverableFiles[0]);
+                formData.append('extract_name', document.getElementById('extractNames').checked);
+            } else {
+                selectedDeliverableFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+                formData.append('extract_names', document.getElementById('extractNames').checked);
+            }
             
             try {
                 const endpoint = selectedDeliverableFiles.length === 1 
@@ -391,7 +397,7 @@
                     loadDeliverables();
                 } else {
                     const error = await response.json();
-                    alert('Error uploading deliverables: ' + (error.detail || 'Unknown error'));
+                    alert('Error uploading deliverables: ' + (error.detail || JSON.stringify(error)));
                 }
             } catch (error) {
                 alert('Error uploading deliverables: ' + error.message);

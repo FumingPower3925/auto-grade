@@ -160,14 +160,6 @@ class DeliverableService:
                 cleaned_name = self.clean_student_name(name)
                 if cleaned_name != "Unknown":
                     return cleaned_name
-        
-        lines = text.split('\n')[:10]
-        for line in lines:
-            line = line.strip()
-            if re.match(r'^[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+){1,3}$', line):
-                cleaned_name = self.clean_student_name(line)
-                if cleaned_name != "Unknown":
-                    return cleaned_name
                     
         return "Unknown"
     
