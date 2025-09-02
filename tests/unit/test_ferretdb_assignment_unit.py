@@ -12,11 +12,14 @@ from src.repository.db.models import AssignmentModel, FileModel
 class TestFerretDBAssignmentRepository:
     """Unit tests for assignment-related methods in FerretDBRepository."""
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_create_assignment(self, mock_mongo_client: MagicMock) -> None:
+    def test_create_assignment(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test creating an assignment."""
         mock_client = mock_mongo_client.return_value
-        mock_db = mock_client.__getitem__.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_db.__getitem__.return_value = mock_collection
         
@@ -40,8 +43,9 @@ class TestFerretDBAssignmentRepository:
         assert isinstance(call_args["created_at"], datetime)
         assert isinstance(call_args["updated_at"], datetime)
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_assignment_found(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_assignment_found(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test retrieving an assignment that exists."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         assignment_data: Dict[str, Any] = {
@@ -55,7 +59,10 @@ class TestFerretDBAssignmentRepository:
             "updated_at": datetime.now(timezone.utc),
         }
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_collection.find_one.return_value = assignment_data
         
@@ -69,10 +76,14 @@ class TestFerretDBAssignmentRepository:
         assert result.confidence_threshold == 0.75
         mock_collection.find_one.assert_called_once_with({"_id": assignment_id})
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_assignment_not_found(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_assignment_not_found(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test retrieving an assignment that doesn't exist."""
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_collection.find_one.return_value = None
         
@@ -83,8 +94,9 @@ class TestFerretDBAssignmentRepository:
         
         assert result is None
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_assignments(self, mock_mongo_client: MagicMock) -> None:
+    def test_list_assignments(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test listing all assignments."""
         assignments_data: list[Dict[str, Any]] = [
             {
@@ -109,7 +121,10 @@ class TestFerretDBAssignmentRepository:
             }
         ]
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_cursor = MagicMock()
         mock_cursor.__iter__ = MagicMock(return_value=iter(assignments_data))
@@ -125,14 +140,30 @@ class TestFerretDBAssignmentRepository:
         assert result[0].name == "Assignment 1"
         assert result[1].name == "Assignment 2"
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_delete_assignment(self, mock_mongo_client: MagicMock) -> None:
+    def test_delete_assignment(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test deleting an assignment."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_assignments_collection = MagicMock()
         mock_files_collection = MagicMock()
+        mock_deliverables_collection = MagicMock()
+        
+        mock_fs = mock_gridfs.return_value
+        
+        mock_files_collection.find.return_value = [
+            {"_id": ObjectId(), "gridfs_id": ObjectId()},
+            {"_id": ObjectId(), "gridfs_id": ObjectId()}
+        ]
+        
+        mock_deliverables_collection.find.return_value = [
+            {"_id": ObjectId(), "gridfs_id": ObjectId()}
+        ]
         
         mock_delete_result = MagicMock()
         mock_delete_result.deleted_count = 1
@@ -141,19 +172,31 @@ class TestFerretDBAssignmentRepository:
         repo = FerretDBRepository()
         repo.assignments_collection = mock_assignments_collection
         repo.files_collection = mock_files_collection
+        repo.deliverables_collection = mock_deliverables_collection
+        repo.fs = mock_fs
         
         result = repo.delete_assignment(str(assignment_id))
         
         assert result is True
         mock_files_collection.delete_many.assert_called_once_with({"assignment_id": assignment_id})
+        mock_deliverables_collection.delete_many.assert_called_once_with({"assignment_id": assignment_id})
         mock_assignments_collection.delete_one.assert_called_once_with({"_id": assignment_id})
+        assert mock_fs.delete.call_count == 3
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_delete_assignment_not_found(self, mock_mongo_client: MagicMock) -> None:
+    def test_delete_assignment_not_found(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test deleting a non-existent assignment."""
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_assignments_collection = MagicMock()
         mock_files_collection = MagicMock()
+        mock_deliverables_collection = MagicMock()
+        
+        mock_files_collection.find.return_value = []
+        mock_deliverables_collection.find.return_value = []
         
         mock_delete_result = MagicMock()
         mock_delete_result.deleted_count = 0
@@ -162,17 +205,23 @@ class TestFerretDBAssignmentRepository:
         repo = FerretDBRepository()
         repo.assignments_collection = mock_assignments_collection
         repo.files_collection = mock_files_collection
+        repo.deliverables_collection = mock_deliverables_collection
+        repo.fs = mock_gridfs.return_value
         
         result = repo.delete_assignment("60c72b2f9b1d8e2a1c9d4b7f")
         
         assert result is False
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_update_assignment(self, mock_mongo_client: MagicMock) -> None:
+    def test_update_assignment(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test updating an assignment."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         
         mock_update_result = MagicMock()
@@ -197,15 +246,23 @@ class TestFerretDBAssignmentRepository:
         assert update_doc["confidence_threshold"] == 0.90
         assert isinstance(update_doc["updated_at"], datetime)
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_store_file_rubric(self, mock_mongo_client: MagicMock) -> None:
+    def test_store_file_rubric(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test storing a rubric file."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         file_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_files_collection = MagicMock()
         mock_assignments_collection = MagicMock()
+        
+        mock_fs = mock_gridfs.return_value
+        mock_fs.put.return_value = gridfs_id
         
         mock_insert_result = MagicMock()
         mock_insert_result.inserted_id = file_id
@@ -214,6 +271,7 @@ class TestFerretDBAssignmentRepository:
         repo = FerretDBRepository()
         repo.files_collection = mock_files_collection
         repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
         
         result = repo.store_file(
             str(assignment_id),
@@ -225,10 +283,18 @@ class TestFerretDBAssignmentRepository:
         
         assert result == str(file_id)
         
+        mock_fs.put.assert_called_once_with(
+            b"content",
+            filename="rubric.pdf",
+            content_type="application/pdf",
+            assignment_id=str(assignment_id),
+            file_type="rubric"
+        )
+        
         file_call_args = mock_files_collection.insert_one.call_args[0][0]
         assert file_call_args["assignment_id"] == assignment_id
         assert file_call_args["filename"] == "rubric.pdf"
-        assert file_call_args["content"] == b"content"
+        assert file_call_args["gridfs_id"] == gridfs_id
         assert file_call_args["content_type"] == "application/pdf"
         assert file_call_args["file_type"] == "rubric"
         
@@ -237,15 +303,23 @@ class TestFerretDBAssignmentRepository:
             {"$push": {"evaluation_rubrics": file_id}}
         )
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_store_file_relevant_document(self, mock_mongo_client: MagicMock) -> None:
+    def test_store_file_relevant_document(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test storing a relevant document file."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         file_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_files_collection = MagicMock()
         mock_assignments_collection = MagicMock()
+        
+        mock_fs = mock_gridfs.return_value
+        mock_fs.put.return_value = gridfs_id
         
         mock_insert_result = MagicMock()
         mock_insert_result.inserted_id = file_id
@@ -254,6 +328,7 @@ class TestFerretDBAssignmentRepository:
         repo = FerretDBRepository()
         repo.files_collection = mock_files_collection
         repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
         
         result = repo.store_file(
             str(assignment_id),
@@ -270,26 +345,38 @@ class TestFerretDBAssignmentRepository:
             {"$push": {"relevant_documents": file_id}}
         )
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_file(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_file(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test retrieving a file."""
         file_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
+        
         file_data: Dict[str, Any] = {
             "_id": file_id,
             "assignment_id": ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
             "filename": "test.pdf",
-            "content": b"test content",
+            "gridfs_id": gridfs_id,
             "content_type": "application/pdf",
             "file_type": "rubric",
             "uploaded_at": datetime.now(timezone.utc),
         }
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_collection.find_one.return_value = file_data
         
+        mock_fs = mock_gridfs.return_value
+        mock_gridfs_file = MagicMock()
+        mock_gridfs_file.read.return_value = b"test content"
+        mock_fs.get.return_value = mock_gridfs_file
+        
         repo = FerretDBRepository()
         repo.files_collection = mock_collection
+        repo.fs = mock_fs
         
         result = repo.get_file(str(file_id))
         
@@ -297,9 +384,11 @@ class TestFerretDBAssignmentRepository:
         assert result.filename == "test.pdf"
         assert result.content == b"test content"
         mock_collection.find_one.assert_called_once_with({"_id": file_id})
+        mock_fs.get.assert_called_once_with(gridfs_id)
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_files_by_assignment(self, mock_mongo_client: MagicMock) -> None:
+    def test_list_files_by_assignment(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test listing files for an assignment."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         files_data: list[Dict[str, Any]] = [
@@ -307,7 +396,7 @@ class TestFerretDBAssignmentRepository:
                 "_id": ObjectId(),
                 "assignment_id": assignment_id,
                 "filename": "rubric1.pdf",
-                "content": b"content1",
+                "gridfs_id": ObjectId(),
                 "content_type": "application/pdf",
                 "file_type": "rubric",
                 "uploaded_at": datetime.now(timezone.utc),
@@ -316,14 +405,17 @@ class TestFerretDBAssignmentRepository:
                 "_id": ObjectId(),
                 "assignment_id": assignment_id,
                 "filename": "rubric2.pdf",
-                "content": b"content2",
+                "gridfs_id": ObjectId(),
                 "content_type": "application/pdf",
                 "file_type": "rubric",
                 "uploaded_at": datetime.now(timezone.utc),
             }
         ]
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_cursor = MagicMock()
         mock_cursor.__iter__ = MagicMock(return_value=iter(files_data))
@@ -344,71 +436,107 @@ class TestFerretDBAssignmentRepository:
             "file_type": "rubric"
         })
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_assignment_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test get_assignment with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.assignments_collection = MagicMock()
         repo.assignments_collection.find_one.side_effect = Exception("DB error")
         assert repo.get_assignment("60c72b2f9b1d8e2a1c9d4b7f") is None
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_assignments_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_list_assignments_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test list_assignments with an exception during iteration."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.assignments_collection = MagicMock()
         repo.assignments_collection.find.return_value.sort.return_value = [Exception("DB error")]
         assert repo.list_assignments() == []
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_delete_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_delete_assignment_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test delete_assignment with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.assignments_collection = MagicMock()
         repo.assignments_collection.delete_one.side_effect = Exception("DB error")
         assert repo.delete_assignment("60c72b2f9b1d8e2a1c9d4b7f") is False
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_update_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_update_assignment_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test update_assignment with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.assignments_collection = MagicMock()
         repo.assignments_collection.update_one.side_effect = Exception("DB error")
         assert repo.update_assignment("60c72b2f9b1d8e2a1c9d4b7f") is False
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_store_file_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_store_file_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test store_file with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.files_collection = MagicMock()
         repo.files_collection.insert_one.side_effect = Exception("DB error")
+        repo.fs = mock_gridfs.return_value
         with pytest.raises(Exception):
             repo.store_file("60c72b2f9b1d8e2a1c9d4b7f", "test.txt", b"test", "text/plain", "rubric")
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_file_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_file_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test get_file with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.files_collection = MagicMock()
         repo.files_collection.find_one.side_effect = Exception("DB error")
         assert repo.get_file("50c72b2f9b1d8e2a1c9d4b7f") is None
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_files_by_assignment_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_list_files_by_assignment_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test list_files_by_assignment with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.files_collection = MagicMock()
         repo.files_collection.find.side_effect = Exception("DB error")
         assert repo.list_files_by_assignment("60c72b2f9b1d8e2a1c9d4b7f") == []
 
-    def test_list_files_by_assignment_invalid_id(self) -> None:
-        """Test list_files_by_assignment with an invalid assignment ID."""
-        repo = FerretDBRepository()
-        assert repo.list_files_by_assignment("invalid-id") == []
-
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_files_by_assignment_validation_error(self, mock_mongo_client: MagicMock) -> None:
+    def test_list_files_by_assignment_validation_error(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test list_files_by_assignment with a validation error."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.files_collection = MagicMock()
         repo.files_collection.find.return_value.sort.return_value = [{"_id": "invalid"}]

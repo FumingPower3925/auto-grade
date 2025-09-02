@@ -11,15 +11,23 @@ from src.repository.db.models import DeliverableModel
 class TestFerretDBDeliverableRepository:
     """Unit tests for deliverable-related methods in FerretDBRepository."""
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_store_deliverable(self, mock_mongo_client: MagicMock) -> None:
+    def test_store_deliverable(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test storing a deliverable."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         deliverable_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_deliverables_collection = MagicMock()
         mock_assignments_collection = MagicMock()
+        
+        mock_fs = mock_gridfs.return_value
+        mock_fs.put.return_value = gridfs_id
         
         mock_insert_result = MagicMock()
         mock_insert_result.inserted_id = deliverable_id
@@ -28,6 +36,7 @@ class TestFerretDBDeliverableRepository:
         repo = FerretDBRepository()
         repo.deliverables_collection = mock_deliverables_collection
         repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
         
         result = repo.store_deliverable(
             str(assignment_id),
@@ -41,10 +50,18 @@ class TestFerretDBDeliverableRepository:
         
         assert result == str(deliverable_id)
         
+        mock_fs.put.assert_called_once_with(
+            b"pdf content",
+            filename="submission.pdf",
+            content_type="application/pdf",
+            assignment_id=str(assignment_id),
+            student_name="John Doe"
+        )
+        
         call_args = mock_deliverables_collection.insert_one.call_args[0][0]
         assert call_args["assignment_id"] == assignment_id
         assert call_args["filename"] == "submission.pdf"
-        assert call_args["content"] == b"pdf content"
+        assert call_args["gridfs_id"] == gridfs_id
         assert call_args["extension"] == "pdf"
         assert call_args["content_type"] == "application/pdf"
         assert call_args["student_name"] == "John Doe"
@@ -58,10 +75,13 @@ class TestFerretDBDeliverableRepository:
         assert "$push" in update_call[1]
         assert update_call[1]["$push"]["deliverables"] == deliverable_id
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_deliverable_found(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_deliverable_found(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test retrieving a deliverable that exists."""
         deliverable_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
+        
         deliverable_data: Dict[str, Any] = {
             "_id": deliverable_id,
             "assignment_id": ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
@@ -69,7 +89,7 @@ class TestFerretDBDeliverableRepository:
             "mark": 85.5,
             "certainty_threshold": 0.95,
             "filename": "assignment.pdf",
-            "content": b"pdf content",
+            "gridfs_id": gridfs_id,
             "extension": "pdf",
             "content_type": "application/pdf",
             "uploaded_at": datetime.now(timezone.utc),
@@ -77,12 +97,21 @@ class TestFerretDBDeliverableRepository:
             "extracted_text": None
         }
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_collection.find_one.return_value = deliverable_data
         
+        mock_fs = mock_gridfs.return_value
+        mock_gridfs_file = MagicMock()
+        mock_gridfs_file.read.return_value = b"pdf content"
+        mock_fs.get.return_value = mock_gridfs_file
+        
         repo = FerretDBRepository()
         repo.deliverables_collection = mock_collection
+        repo.fs = mock_fs
         
         result = repo.get_deliverable(str(deliverable_id))
         
@@ -91,12 +120,18 @@ class TestFerretDBDeliverableRepository:
         assert result.mark == 85.5
         assert result.certainty_threshold == 0.95
         assert result.filename == "assignment.pdf"
+        assert result.content == b"pdf content"
         mock_collection.find_one.assert_called_once_with({"_id": deliverable_id})
+        mock_fs.get.assert_called_once_with(gridfs_id)
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_deliverable_not_found(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_deliverable_not_found(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test retrieving a deliverable that doesn't exist."""
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_collection.find_one.return_value = None
         
@@ -107,8 +142,9 @@ class TestFerretDBDeliverableRepository:
         
         assert result is None
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_deliverables_by_assignment(self, mock_mongo_client: MagicMock) -> None:
+    def test_list_deliverables_by_assignment(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test listing deliverables for an assignment."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         deliverables_data: list[Dict[str, Any]] = [
@@ -119,7 +155,7 @@ class TestFerretDBDeliverableRepository:
                 "mark": None,
                 "certainty_threshold": None,
                 "filename": "submission1.pdf",
-                "content": b"content1",
+                "gridfs_id": ObjectId(),
                 "extension": "pdf",
                 "content_type": "application/pdf",
                 "uploaded_at": datetime.now(timezone.utc),
@@ -133,7 +169,7 @@ class TestFerretDBDeliverableRepository:
                 "mark": 90.0,
                 "certainty_threshold": 0.85,
                 "filename": "submission2.pdf",
-                "content": b"content2",
+                "gridfs_id": ObjectId(),
                 "extension": "pdf",
                 "content_type": "application/pdf",
                 "uploaded_at": datetime.now(timezone.utc),
@@ -142,7 +178,10 @@ class TestFerretDBDeliverableRepository:
             }
         ]
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_cursor = MagicMock()
         mock_cursor.__iter__ = MagicMock(return_value=iter(deliverables_data))
@@ -161,12 +200,16 @@ class TestFerretDBDeliverableRepository:
         
         mock_collection.find.assert_called_once_with({"assignment_id": assignment_id})
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_update_deliverable(self, mock_mongo_client: MagicMock) -> None:
+    def test_update_deliverable(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test updating a deliverable."""
         deliverable_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         
         mock_update_result = MagicMock()
@@ -193,20 +236,28 @@ class TestFerretDBDeliverableRepository:
         assert update_doc["certainty_threshold"] == 0.80
         assert isinstance(update_doc["updated_at"], datetime)
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_delete_deliverable(self, mock_mongo_client: MagicMock) -> None:
+    def test_delete_deliverable(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test deleting a deliverable."""
         deliverable_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_deliverables_collection = MagicMock()
         mock_assignments_collection = MagicMock()
         
         mock_deliverables_collection.find_one.return_value = {
             "_id": deliverable_id,
-            "assignment_id": assignment_id
+            "assignment_id": assignment_id,
+            "gridfs_id": gridfs_id
         }
+        
+        mock_fs = mock_gridfs.return_value
         
         mock_delete_result = MagicMock()
         mock_delete_result.deleted_count = 1
@@ -215,12 +266,14 @@ class TestFerretDBDeliverableRepository:
         repo = FerretDBRepository()
         repo.deliverables_collection = mock_deliverables_collection
         repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
         
         result = repo.delete_deliverable(str(deliverable_id))
         
         assert result is True
         
         mock_deliverables_collection.find_one.assert_called_once_with({"_id": deliverable_id})
+        mock_fs.delete.assert_called_once_with(gridfs_id)
         
         mock_assignments_collection.update_one.assert_called_once()
         update_call = mock_assignments_collection.update_one.call_args[0]
@@ -230,10 +283,14 @@ class TestFerretDBDeliverableRepository:
         
         mock_deliverables_collection.delete_one.assert_called_once_with({"_id": deliverable_id})
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_delete_deliverable_not_found(self, mock_mongo_client: MagicMock) -> None:
+    def test_delete_deliverable_not_found(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test deleting a non-existent deliverable."""
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_deliverables_collection = MagicMock()
         mock_assignments_collection = MagicMock()
         
@@ -242,6 +299,7 @@ class TestFerretDBDeliverableRepository:
         repo = FerretDBRepository()
         repo.deliverables_collection = mock_deliverables_collection
         repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_gridfs.return_value
         
         result = repo.delete_deliverable("50c72b2f9b1d8e2a1c9d4b7f")
         
@@ -249,66 +307,100 @@ class TestFerretDBDeliverableRepository:
         mock_deliverables_collection.delete_one.assert_not_called()
         mock_assignments_collection.update_one.assert_not_called()
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_store_deliverable_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_store_deliverable_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test store_deliverable with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.deliverables_collection = MagicMock()
         repo.deliverables_collection.insert_one.side_effect = Exception("DB error")
+        repo.fs = mock_gridfs.return_value
         
         with pytest.raises(Exception):
             repo.store_deliverable("60c72b2f9b1d8e2a1c9d4b7f", "test.pdf", b"content", "pdf", "application/pdf")
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_get_deliverable_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_get_deliverable_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test get_deliverable with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.deliverables_collection = MagicMock()
         repo.deliverables_collection.find_one.side_effect = Exception("DB error")
         
         assert repo.get_deliverable("50c72b2f9b1d8e2a1c9d4b7f") is None
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_deliverables_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_list_deliverables_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test list_deliverables_by_assignment with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.deliverables_collection = MagicMock()
         repo.deliverables_collection.find.side_effect = Exception("DB error")
         
         assert repo.list_deliverables_by_assignment("60c72b2f9b1d8e2a1c9d4b7f") == []
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_update_deliverable_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_update_deliverable_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test update_deliverable with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.deliverables_collection = MagicMock()
         repo.deliverables_collection.update_one.side_effect = Exception("DB error")
         
         assert repo.update_deliverable("50c72b2f9b1d8e2a1c9d4b7f", student_name="Test") is False
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_delete_deliverable_exception(self, mock_mongo_client: MagicMock) -> None:
+    def test_delete_deliverable_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test delete_deliverable with an exception."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         repo = FerretDBRepository()
         repo.deliverables_collection = MagicMock()
         repo.deliverables_collection.find_one.side_effect = Exception("DB error")
         
         assert repo.delete_deliverable("50c72b2f9b1d8e2a1c9d4b7f") is False
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_delete_deliverable_with_exception_during_update(self, mock_mongo_client: MagicMock) -> None:
+    def test_delete_deliverable_with_exception_during_update(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test delete_deliverable when assignment update fails."""
         deliverable_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_deliverables_collection = MagicMock()
         mock_assignments_collection = MagicMock()
         
         mock_deliverables_collection.find_one.return_value = {
             "_id": deliverable_id,
-            "assignment_id": assignment_id
+            "assignment_id": assignment_id,
+            "gridfs_id": gridfs_id
         }
+        
+        mock_fs = mock_gridfs.return_value
         
         mock_assignments_collection.update_one.side_effect = Exception("Update failed")
         
@@ -319,14 +411,17 @@ class TestFerretDBDeliverableRepository:
         repo = FerretDBRepository()
         repo.deliverables_collection = mock_deliverables_collection
         repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
         
         result = repo.delete_deliverable(str(deliverable_id))
         
-        assert result is False
+        assert result is True
+        mock_fs.delete.assert_called_once_with(gridfs_id)
 
+    @patch('src.repository.db.ferretdb.repository.GridFS')
     @patch('src.repository.db.ferretdb.repository.MongoClient')
-    def test_list_deliverables_invalid_document(self, mock_mongo_client: MagicMock) -> None:
-        """Test list_deliverables_by_assignment with invalid document (lines 217-218)."""
+    def test_list_deliverables_invalid_document(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test list_deliverables_by_assignment with invalid document."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         
         deliverables_data: list[Dict[str, Any]] = [
@@ -335,7 +430,7 @@ class TestFerretDBDeliverableRepository:
                 "assignment_id": assignment_id,
                 "student_name": "Valid Student",
                 "filename": "valid.pdf",
-                "content": b"content",
+                "gridfs_id": ObjectId(),
                 "extension": "pdf",
                 "content_type": "application/pdf",
                 "uploaded_at": datetime.now(timezone.utc),
@@ -347,7 +442,10 @@ class TestFerretDBDeliverableRepository:
             }
         ]
         
-        mock_mongo_client.return_value
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        
         mock_collection = MagicMock()
         mock_cursor = MagicMock()
         mock_cursor.__iter__ = MagicMock(return_value=iter(deliverables_data))
