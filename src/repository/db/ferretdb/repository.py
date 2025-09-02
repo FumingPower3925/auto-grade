@@ -5,10 +5,10 @@ from pymongo.database import Database
 from pymongo.collection import Collection
 from pymongo.errors import ConnectionFailure
 from bson import ObjectId
+from gridfs import GridFS
 from config.config import get_config
 from src.repository.db.base import DatabaseRepository
 from src.repository.db.models import DocumentModel, AssignmentModel, FileModel, DeliverableModel
-
 
 class FerretDBRepository(DatabaseRepository):
 
@@ -20,6 +20,7 @@ class FerretDBRepository(DatabaseRepository):
         self.assignments_collection: Collection[Dict[str, Any]] = self.db["assignments"]
         self.files_collection: Collection[Dict[str, Any]] = self.db["files"]
         self.deliverables_collection: Collection[Dict[str, Any]] = self.db["deliverables"]
+        self.fs = GridFS(self.db)
 
     def health(self) -> bool:
         try:
@@ -27,23 +28,29 @@ class FerretDBRepository(DatabaseRepository):
             return True
         except ConnectionFailure:
             return False
-
+        
     def store_document(self, assignment: str, deliverable: str, student_name: str, document: bytes, extension: str) -> str:
+        file_id = self.fs.put(document, filename=f"{student_name}_{assignment}.{extension}")
+        
         document_data: Dict[str, Any] = {
             "assignment": assignment,
             "deliverable": deliverable,
             "student_name": student_name,
-            "document": document,
+            "gridfs_id": file_id,
             "extension": extension,
+            "file_size": len(document),
         }
         result = self.collection.insert_one(document_data)
         return str(result.inserted_id)
-
+    
     def get_document(self, document_id: str) -> Optional[DocumentModel]:
         try:
             obj_id = ObjectId(document_id)
             document = self.collection.find_one({"_id": obj_id})
             if document:
+                if 'gridfs_id' in document:
+                    file_data = self.fs.get(document['gridfs_id'])
+                    document['document'] = file_data.read()
                 return DocumentModel.model_validate(document)
             return None
         except Exception:
@@ -85,6 +92,14 @@ class FerretDBRepository(DatabaseRepository):
         try:
             obj_id = ObjectId(assignment_id)
             
+            for file_doc in self.files_collection.find({"assignment_id": obj_id}):
+                if 'gridfs_id' in file_doc:
+                    self.fs.delete(file_doc['gridfs_id'])
+            
+            for deliverable_doc in self.deliverables_collection.find({"assignment_id": obj_id}):
+                if 'gridfs_id' in deliverable_doc:
+                    self.fs.delete(deliverable_doc['gridfs_id'])
+            
             self.files_collection.delete_many({"assignment_id": obj_id})
             self.deliverables_collection.delete_many({"assignment_id": obj_id})
             
@@ -111,12 +126,22 @@ class FerretDBRepository(DatabaseRepository):
                    content_type: str, file_type: str) -> str:
         try:
             obj_id = ObjectId(assignment_id)
+            
+            gridfs_id = self.fs.put(
+                content, 
+                filename=filename,
+                content_type=content_type,
+                assignment_id=str(obj_id),
+                file_type=file_type
+            )
+            
             file_data: Dict[str, Any] = {
                 "assignment_id": obj_id,
                 "filename": filename,
-                "content": content,
+                "gridfs_id": gridfs_id,
                 "content_type": content_type,
                 "file_type": file_type,
+                "file_size": len(content),
                 "uploaded_at": datetime.now(timezone.utc),
             }
             result = self.files_collection.insert_one(file_data)
@@ -142,6 +167,9 @@ class FerretDBRepository(DatabaseRepository):
             obj_id = ObjectId(file_id)
             file_doc = self.files_collection.find_one({"_id": obj_id})
             if file_doc:
+                if 'gridfs_id' in file_doc:
+                    file_data = self.fs.get(file_doc['gridfs_id'])
+                    file_doc['content'] = file_data.read()
                 return FileModel.model_validate(file_doc)
             return None
         except Exception:
@@ -157,6 +185,8 @@ class FerretDBRepository(DatabaseRepository):
             files: List[FileModel] = []
             for doc in self.files_collection.find(query).sort("uploaded_at", -1):
                 try:
+                    if 'gridfs_id' in doc:
+                        doc['content'] = b''
                     files.append(FileModel.model_validate(doc))
                 except Exception:
                     continue
@@ -169,15 +199,25 @@ class FerretDBRepository(DatabaseRepository):
                          extracted_text: Optional[str] = None) -> str:
         try:
             obj_id = ObjectId(assignment_id)
+            
+            gridfs_id = self.fs.put(
+                content,
+                filename=filename,
+                content_type=content_type,
+                assignment_id=str(obj_id),
+                student_name=student_name
+            )
+            
             deliverable_data: Dict[str, Any] = {
                 "assignment_id": obj_id,
                 "student_name": student_name,
                 "mark": None,
                 "certainty_threshold": None,
                 "filename": filename,
-                "content": content,
+                "gridfs_id": gridfs_id,
                 "extension": extension,
                 "content_type": content_type,
+                "file_size": len(content),
                 "uploaded_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
                 "extracted_text": extracted_text,
@@ -202,6 +242,11 @@ class FerretDBRepository(DatabaseRepository):
             obj_id = ObjectId(deliverable_id)
             deliverable = self.deliverables_collection.find_one({"_id": obj_id})
             if deliverable:
+                if 'gridfs_id' in deliverable:
+                    file_data = self.fs.get(deliverable['gridfs_id'])
+                    deliverable['content'] = file_data.read()
+                else:
+                    deliverable['content'] = deliverable.get('content', b'')
                 return DeliverableModel.model_validate(deliverable)
             return None
         except Exception:
@@ -213,6 +258,10 @@ class FerretDBRepository(DatabaseRepository):
             deliverables: List[DeliverableModel] = []
             for doc in self.deliverables_collection.find({"assignment_id": obj_id}).sort("uploaded_at", -1):
                 try:
+                    if 'gridfs_id' in doc:
+                        doc['content'] = b''
+                    else:
+                        doc['content'] = doc.get('content', b'')
                     deliverables.append(DeliverableModel.model_validate(doc))
                 except Exception:
                     continue
@@ -233,7 +282,7 @@ class FerretDBRepository(DatabaseRepository):
             return result.modified_count > 0
         except Exception:
             return False
-
+        
     def delete_deliverable(self, deliverable_id: str) -> bool:
         try:
             obj_id = ObjectId(deliverable_id)
@@ -241,6 +290,9 @@ class FerretDBRepository(DatabaseRepository):
             deliverable = self.deliverables_collection.find_one({"_id": obj_id})
             if not deliverable:
                 return False
+            
+            if 'gridfs_id' in deliverable:
+                self.fs.delete(deliverable['gridfs_id'])
             
             self.assignments_collection.update_one(
                 {"_id": deliverable["assignment_id"]},
