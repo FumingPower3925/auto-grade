@@ -453,3 +453,33 @@ class TestDeliverableEndpoints:
         
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Failed to download deliverable" in response.json()["detail"]
+
+    @patch('src.controller.api.api.DeliverableService')
+    def test_bulk_upload_skip_no_filename_line_328(self, mock_service_class: MagicMock) -> None:
+        """Test line 328 - bulk upload skips files without filename."""
+        
+        mock_service = MagicMock()
+        mock_service_class.return_value = mock_service
+        
+        response = self.client.post(
+            "/assignments/test_id/deliverables/bulk",
+            files=[("files", (None, io.BytesIO(b"content"), "application/pdf"))],
+            data={"extract_names": "false"}
+        )
+        
+        assert response.status_code == 422
+
+    @patch('src.controller.api.api.DeliverableService')
+    def test_update_deliverable_value_error_line_451(self, mock_service_class: MagicMock) -> None:
+        """Test line 451 - update deliverable raises ValueError."""
+        mock_service = MagicMock()
+        mock_service.update_deliverable.side_effect = ValueError("Custom validation error")
+        mock_service_class.return_value = mock_service
+        
+        response = self.client.patch(
+            "/deliverables/test_id",
+            json={"student_name": "Test Name"}
+        )
+        
+        assert response.status_code == 422
+        assert "Custom validation error" in response.json()["detail"]

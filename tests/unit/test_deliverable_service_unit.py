@@ -1110,15 +1110,6 @@ class TestDeliverableService:
         assert service.clean_student_name("1 2 3") == "Unknown"
 
     @patch('src.service.deliverable_service.get_database_repository')
-    def test_extract_name_from_individual_line(self, mock_get_repo: MagicMock) -> None:
-        """Test lines 168-170 - extract name from individual line."""
-        service = DeliverableService()
-        
-        text = "Assignment Title\nJohn Smith\nDate: 2024"
-        result = service.extract_name_from_text(text)
-        assert result == "John Smith"
-
-    @patch('src.service.deliverable_service.get_database_repository')
     def test_upload_multiple_deliverables_assignment_not_found(self, mock_get_repo: MagicMock) -> None:
         """Test line 226 - assignment not found in bulk upload."""
         mock_repo = MagicMock()
@@ -1133,3 +1124,101 @@ class TestDeliverableService:
                 [("file.pdf", b"content", "pdf", "application/pdf")],
                 extract_names=False
             )
+
+    @patch('src.service.deliverable_service.logger')
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_lines_168_170_pdf_extraction_coverage(self, mock_get_repo: MagicMock, mock_logger: MagicMock) -> None:
+        """Test lines 168-170 - PDF extraction with name extraction and logging."""
+        from src.repository.db.models import AssignmentModel
+        from bson import ObjectId
+        from datetime import datetime, timezone
+        
+        mock_repo = MagicMock()
+        mock_assignment = AssignmentModel(
+            _id=ObjectId(),
+            name="Test Assignment",
+            confidence_threshold=0.75,
+            deliverables=[],
+            evaluation_rubrics=[],
+            relevant_documents=[],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
+        )
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_deliverable.return_value = "deliverable_id"
+        mock_get_repo.return_value = mock_repo
+        
+        with patch.object(DeliverableService, 'extract_student_name_from_pdf', return_value=("Alice Johnson", "extracted text")):
+            service = DeliverableService()
+            result = service.upload_deliverable(
+                "assignment_id",
+                "homework.pdf",
+                b"pdf content",
+                "pdf",
+                "application/pdf",
+                extract_name=True
+            )
+            
+            assert result == "deliverable_id"
+            mock_logger.info.assert_called_with("Extracted student name: Alice Johnson")
+            mock_repo.store_deliverable.assert_called_with(
+                assignment_id="assignment_id",
+                filename="homework.pdf",
+                content=b"pdf content",
+                extension="pdf",
+                content_type="application/pdf",
+                student_name="Alice Johnson",
+                extracted_text="extracted text"
+            )
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_from_text_lines_168_170(self, mock_get_repo: MagicMock) -> None:
+        """Test lines 168-170 - extract name from line matching pattern."""
+        service = DeliverableService()
+        
+        text = "assignment title\nMary Johnson\ndate: 2024"
+        result = service.extract_name_from_text(text)
+        assert result == "Mary Johnson"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_line_by_line_pattern(self, mock_get_repo: MagicMock) -> None:
+        """Test lines 168-170 - line by line pattern matching."""
+        service = DeliverableService()
+        
+        text = "homework assignment\nSarah Williams\nsubmission date"
+        result = service.extract_name_from_text(text)
+        assert result == "Sarah Williams"
+        
+        with patch.object(service, 'clean_student_name', return_value="Unknown"):
+            text = "some text\nJohn Doe\nmore text"
+            result = service.extract_name_from_text(text)
+            assert result == "Unknown"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_line_169_170_clean_returns_unknown(self, mock_get_repo: MagicMock) -> None:
+        """Test lines 169-170 - when line matches but clean returns Unknown."""
+        service = DeliverableService()
+        
+        text = "not a name\nA B\nmore text"
+
+        with patch.object(service, 'clean_student_name', side_effect=lambda x: "Unknown" if x == "A B" else x): # type: ignore
+            result = service.extract_name_from_text(text)
+            assert result == "Unknown"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_from_line_successful(self, mock_get_repo: MagicMock) -> None:
+        """Test line 170 - successfully extract name from individual line."""
+        service = DeliverableService()
+        
+        text = "some random text\nJames Bond\nmore content here"
+        result = service.extract_name_from_text(text)
+        assert result == "James Bond"
+
+    @patch('src.service.deliverable_service.get_database_repository')
+    def test_extract_name_from_individual_line_success(self, mock_get_repo: MagicMock) -> None:
+        """Test line 170 - successfully return name from individual line."""
+        service = DeliverableService()
+        
+        text = "just some text\nJohn Smith\nmore text here"
+        result = service.extract_name_from_text(text)
+        assert result == "John Smith"

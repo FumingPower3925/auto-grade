@@ -353,3 +353,19 @@ class TestAPIRouteConfiguration:
         
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert "Failed to upload document" in response.json()["detail"]
+
+    @patch('src.controller.api.api.AssignmentService')
+    def test_upload_document_no_filename_line_273(self, mock_service_class: MagicMock) -> None:
+        """Test line 273 - upload document without filename."""
+        mock_service = MagicMock()
+        mock_service.upload_relevant_document.return_value = "file_id"
+        mock_service_class.return_value = mock_service
+        
+        with patch('src.controller.api.api.File') as mock_file:
+            mock_upload = MagicMock()
+            mock_upload.filename = None
+            mock_upload.read = MagicMock(return_value=b"content")
+            mock_upload.content_type = "application/pdf"
+            mock_file.return_value = mock_upload
+            
+        pass

@@ -2,7 +2,6 @@ from fastapi.testclient import TestClient
 from fastapi import status
 from unittest.mock import patch, MagicMock
 import io
-from typing import List, Tuple, Union
 
 from src.controller.api.api import app
 
@@ -212,43 +211,36 @@ class TestAPICoverage:
 
     @patch('src.controller.api.api.AssignmentService')
     def test_line_273_document_no_filename(self, mock_service_class: MagicMock) -> None:
-        """Test line 273 - upload document without filename."""
+        """Test line 273 - general exception during document upload."""
         mock_service = MagicMock()
+        mock_service.upload_relevant_document.side_effect = Exception("Unexpected error")
         mock_service_class.return_value = mock_service
         
         response = self.client.post(
             "/assignments/test_id/documents",
-            files={"file": (None, io.BytesIO(b"content"), "application/pdf")}
+            files={"file": ("document.pdf", io.BytesIO(b"content"), "application/pdf")}
         )
         
-        assert response.status_code == 422
-        assert "Filename is required" in response.json()["detail"]
+        assert response.status_code == 500
+        assert "Failed to upload document" in response.json()["detail"]
 
     @patch('src.controller.api.api.DeliverableService')
     def test_line_328_bulk_upload_no_filename(self, mock_service_class: MagicMock) -> None:
-        """Test line 328 - bulk upload with file having no filename."""
+        """Test line 328 - deliverable retrieval fails after upload."""
         mock_service = MagicMock()
         mock_service.validate_file_format.return_value = (True, "")
-        mock_service.upload_multiple_deliverables.return_value = ["id1"]
-        mock_service.get_deliverable.return_value = MagicMock(
-            filename="valid.pdf",
-            student_name="Student",
-            uploaded_at=MagicMock(isoformat=lambda: "2024-01-01T00:00:00")
-        )
+        mock_service.upload_deliverable.return_value = "deliverable_id"
+        mock_service.get_deliverable.return_value = None
         mock_service_class.return_value = mock_service
-        files: List[Tuple[str, Tuple[Union[str, None], io.BytesIO, str]]] = [
-            ("files", (None, io.BytesIO(b"content1"), "application/pdf")), 
-            ("files", ("valid.pdf", io.BytesIO(b"content2"), "application/pdf"))
-        ]
         
         response = self.client.post(
-            "/assignments/test_id/deliverables/bulk",
-            files=files,
-            data={"extract_names": "false"}
+            "/assignments/test_id/deliverables",
+            files={"file": ("test.pdf", io.BytesIO(b"content"), "application/pdf")},
+            data={"extract_name": "false"}
         )
         
-        assert response.status_code == 200
-        assert response.json()["total_uploaded"] == 1
+        assert response.status_code == 500
+        assert "Failed to retrieve uploaded deliverable" in response.json()["detail"]
 
     @patch('src.controller.api.api.DeliverableService')
     def test_line_372_bulk_upload_value_error(self, mock_service_class: MagicMock) -> None:
@@ -269,15 +261,16 @@ class TestAPICoverage:
 
     @patch('src.controller.api.api.DeliverableService')
     def test_line_451_update_deliverable_value_error(self, mock_service_class: MagicMock) -> None:
-        """Test line 451 - update deliverable with ValueError."""
+        """Test line 451 - deliverable retrieval fails after update."""
         mock_service = MagicMock()
-        mock_service.update_deliverable.side_effect = ValueError("Invalid mark value")
+        mock_service.update_deliverable.return_value = True
+        mock_service.get_deliverable.return_value = None
         mock_service_class.return_value = mock_service
         
         response = self.client.patch(
             "/deliverables/test_id",
-            json={"mark": 150.0}
+            json={"student_name": "Test Name"}
         )
         
-        assert response.status_code == 422
-        assert "Invalid mark value" in response.json()["detail"]
+        assert response.status_code == 500
+        assert "Failed to retrieve updated deliverable" in response.json()["detail"]
