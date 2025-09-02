@@ -244,7 +244,7 @@ class DeliverableService:
         Args:
             deliverable_id: The ID of the deliverable.
             student_name: Optional new student name.
-            mark: Optional mark (0-100).
+            mark: Optional mark (0-10).
             certainty_threshold: Optional certainty threshold (0-1).
             
         Returns:
