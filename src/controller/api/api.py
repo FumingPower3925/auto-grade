@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, status
+from fastapi import FastAPI, HTTPException, UploadFile, File, status, Form
 from fastapi.responses import StreamingResponse
+from typing import List, Optional
 import io
 import datetime as datetime
 from src.controller.api.models import (
@@ -9,10 +10,17 @@ from src.controller.api.models import (
     AssignmentListResponse,
     AssignmentDetailResponse,
     FileUploadResponse,
-    FileInfo
+    FileInfo,
+    DeliverableUploadResponse,
+    BulkDeliverableUploadResponse,
+    UpdateDeliverableRequest,
+    DeliverableResponse,
+    DeliverableListResponse,
+    DeleteResponse
 )
 from src.service.health_service import HealthService
 from src.service.assignment_service import AssignmentService
+from src.service.deliverable_service import DeliverableService
 
 
 app = FastAPI(
@@ -59,7 +67,7 @@ async def create_assignment(request: CreateAssignmentRequest) -> AssignmentRespo
             id=str(assignment.id),
             name=assignment.name,
             confidence_threshold=assignment.confidence_threshold,
-            deliverables=assignment.deliverables,
+            deliverables=[str(d) for d in assignment.deliverables],  # type: ignore
             evaluation_rubrics_count=len(assignment.evaluation_rubrics),
             relevant_documents_count=len(assignment.relevant_documents),
             created_at=assignment.created_at.isoformat(),
@@ -86,7 +94,7 @@ async def list_assignments() -> AssignmentListResponse:
                 id=str(assignment.id),
                 name=assignment.name,
                 confidence_threshold=assignment.confidence_threshold,
-                deliverables=assignment.deliverables,
+                deliverables=[str(d) for d in assignment.deliverables],  # type: ignore
                 evaluation_rubrics_count=len(assignment.evaluation_rubrics),
                 relevant_documents_count=len(assignment.relevant_documents),
                 created_at=assignment.created_at.isoformat(),
@@ -142,7 +150,8 @@ async def get_assignment(assignment_id: str) -> AssignmentDetailResponse:
             id=str(assignment.id),
             name=assignment.name,
             confidence_threshold=assignment.confidence_threshold,
-            deliverables=assignment.deliverables,
+            deliverables=[str(d) for d in assignment.deliverables],  # type: ignore
+            deliverables_count=len(assignment.deliverables),
             evaluation_rubrics=rubric_infos,
             relevant_documents=document_infos,
             created_at=assignment.created_at.isoformat(),
@@ -248,3 +257,236 @@ async def download_file(file_id: str):
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to download file")
+
+
+@app.post("/assignments/{assignment_id}/deliverables", response_model=DeliverableUploadResponse, tags=["Deliverables"])
+async def upload_deliverable(
+    assignment_id: str,
+    file: UploadFile = File(...),
+    extract_name: bool = Form(default=True)
+) -> Optional[DeliverableUploadResponse]:
+    """Upload a single deliverable for an assignment."""
+    deliverable_service = DeliverableService()
+    
+    try:
+        if file.filename:
+            is_valid, error_msg = deliverable_service.validate_file_format(
+                file.filename, 
+                file.content_type or "application/octet-stream"
+            )
+            if not is_valid:
+                raise HTTPException(status_code=422, detail=error_msg)
+            
+            content = await file.read()
+            extension = file.filename.split(".")[-1] if "." in file.filename else ""
+            
+            deliverable_id = deliverable_service.upload_deliverable(
+                assignment_id=assignment_id,
+                filename=file.filename,
+                content=content,
+                extension=extension,
+                content_type=file.content_type or "application/octet-stream",
+                extract_name=extract_name
+            )
+        
+            deliverable = deliverable_service.get_deliverable(deliverable_id)
+            if not deliverable:
+                raise HTTPException(status_code=500, detail="Failed to retrieve uploaded deliverable")
+            
+            return DeliverableUploadResponse(
+                id=deliverable_id,
+                filename=deliverable.filename,
+                student_name=deliverable.student_name,
+                uploaded_at=deliverable.uploaded_at.isoformat(),
+                message="Deliverable uploaded successfully"
+            )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to upload deliverable")
+
+
+@app.post("/assignments/{assignment_id}/deliverables/bulk", response_model=BulkDeliverableUploadResponse, tags=["Deliverables"])
+async def upload_multiple_deliverables(
+    assignment_id: str,
+    files: List[UploadFile] = File(...),
+    extract_names: bool = Form(default=True)
+) -> BulkDeliverableUploadResponse:
+    """Upload multiple deliverables for an assignment."""
+    deliverable_service = DeliverableService()
+    
+    try:
+        uploaded_deliverables: List[DeliverableUploadResponse] = []
+        files_data: List[tuple[str, bytes, str, str]] = []
+        
+        for file in files:
+            if file.filename:
+                is_valid, error_msg = deliverable_service.validate_file_format( # type: ignore
+                    file.filename,
+                    file.content_type or "application/octet-stream"
+                )
+                if not is_valid:
+                    continue
+                
+                content = await file.read()
+                extension = file.filename.split(".")[-1] if "." in file.filename else ""
+                files_data.append((
+                    file.filename,
+                    content,
+                    extension,
+                    file.content_type or "application/octet-stream"
+                ))
+        
+        if not files_data:
+            raise HTTPException(status_code=422, detail="No valid files provided")
+        
+        deliverable_ids = deliverable_service.upload_multiple_deliverables(
+            assignment_id=assignment_id,
+            files=files_data,
+            extract_names=extract_names
+        )
+        
+        for deliverable_id in deliverable_ids:
+            deliverable = deliverable_service.get_deliverable(deliverable_id)
+            if deliverable:
+                uploaded_deliverables.append(DeliverableUploadResponse(
+                    id=deliverable_id,
+                    filename=deliverable.filename,
+                    student_name=deliverable.student_name,
+                    uploaded_at=deliverable.uploaded_at.isoformat(),
+                    message="Uploaded successfully"
+                ))
+        
+        return BulkDeliverableUploadResponse(
+            deliverables=uploaded_deliverables,
+            total_uploaded=len(uploaded_deliverables),
+            message=f"Successfully uploaded {len(uploaded_deliverables)} deliverable(s)"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to upload deliverables")
+
+
+@app.get("/assignments/{assignment_id}/deliverables", response_model=DeliverableListResponse, tags=["Deliverables"])
+async def list_deliverables(assignment_id: str) -> DeliverableListResponse:
+    """List all deliverables for an assignment."""
+    deliverable_service = DeliverableService()
+    
+    try:
+        deliverables = deliverable_service.list_deliverables(assignment_id)
+        
+        deliverable_responses = [
+            DeliverableResponse(
+                id=str(deliverable.id),
+                assignment_id=str(deliverable.assignment_id),
+                student_name=deliverable.student_name,
+                mark=deliverable.mark,
+                mark_status="Marked" if deliverable.mark is not None else "Unmarked",
+                certainty_threshold=deliverable.certainty_threshold,
+                filename=deliverable.filename,
+                extension=deliverable.extension,
+                content_type=deliverable.content_type,
+                file_url=f"/api/deliverables/{deliverable.id}/download",
+                uploaded_at=deliverable.uploaded_at.isoformat(),
+                updated_at=deliverable.updated_at.isoformat()
+            )
+            for deliverable in deliverables
+        ]
+        
+        return DeliverableListResponse(
+            deliverables=deliverable_responses,
+            total=len(deliverable_responses)
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to list deliverables")
+
+
+@app.patch("/deliverables/{deliverable_id}", response_model=DeliverableResponse, tags=["Deliverables"])
+async def update_deliverable(
+    deliverable_id: str,
+    request: UpdateDeliverableRequest
+) -> DeliverableResponse:
+    """Update a deliverable's information."""
+    deliverable_service = DeliverableService()
+    
+    try:
+        success = deliverable_service.update_deliverable(
+            deliverable_id=deliverable_id,
+            student_name=request.student_name,
+            mark=request.mark,
+            certainty_threshold=request.certainty_threshold
+        )
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Deliverable not found")
+        
+        deliverable = deliverable_service.get_deliverable(deliverable_id)
+        if not deliverable:
+            raise HTTPException(status_code=500, detail="Failed to retrieve updated deliverable")
+        
+        return DeliverableResponse(
+            id=str(deliverable.id),
+            assignment_id=str(deliverable.assignment_id),
+            student_name=deliverable.student_name,
+            mark=deliverable.mark,
+            mark_status="Marked" if deliverable.mark is not None else "Unmarked",
+            certainty_threshold=deliverable.certainty_threshold,
+            filename=deliverable.filename,
+            extension=deliverable.extension,
+            content_type=deliverable.content_type,
+            file_url=f"/api/deliverables/{deliverable.id}/download",
+            uploaded_at=deliverable.uploaded_at.isoformat(),
+            updated_at=deliverable.updated_at.isoformat()
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to update deliverable")
+
+
+@app.delete("/deliverables/{deliverable_id}", response_model=DeleteResponse, tags=["Deliverables"])
+async def delete_deliverable(deliverable_id: str) -> DeleteResponse:
+    """Delete a deliverable."""
+    deliverable_service = DeliverableService()
+    
+    try:
+        success = deliverable_service.delete_deliverable(deliverable_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Deliverable not found")
+        
+        return DeleteResponse(message="Deliverable deleted successfully")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to delete deliverable")
+
+
+@app.get("/deliverables/{deliverable_id}/download", tags=["Deliverables"])
+async def download_deliverable(deliverable_id: str):
+    """Download a deliverable file."""
+    deliverable_service = DeliverableService()
+    
+    try:
+        deliverable = deliverable_service.get_deliverable(deliverable_id)
+        if not deliverable:
+            raise HTTPException(status_code=404, detail="Deliverable not found")
+        
+        return StreamingResponse(
+            io.BytesIO(deliverable.content),
+            media_type=deliverable.content_type,
+            headers={
+                "Content-Disposition": f"inline; filename={deliverable.filename}"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to download deliverable")

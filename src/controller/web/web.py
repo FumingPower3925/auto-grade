@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from src.service.assignment_service import AssignmentService
+from src.service.deliverable_service import DeliverableService
 
 app = APIRouter()
 templates = Jinja2Templates(directory="src/view")
@@ -51,6 +52,7 @@ async def assignments_list(request: Request):
 async def assignment_detail(request: Request, assignment_id: str):
     """Assignment detail page."""
     assignment_service = AssignmentService()
+    deliverable_service = DeliverableService()
     
     try:
         assignment = assignment_service.get_assignment(assignment_id)
@@ -59,6 +61,7 @@ async def assignment_detail(request: Request, assignment_id: str):
         
         rubrics = assignment_service.list_rubrics(assignment_id)
         documents = assignment_service.list_relevant_documents(assignment_id)
+        deliverables = deliverable_service.list_deliverables(assignment_id)
         
         return templates.TemplateResponse(
             "assignment_detail.html",
@@ -67,6 +70,7 @@ async def assignment_detail(request: Request, assignment_id: str):
                 "assignment": assignment,
                 "rubrics": rubrics,
                 "documents": documents,
+                "deliverables": deliverables,
                 "assignment_id": assignment_id
             }
         )

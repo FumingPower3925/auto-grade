@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Any
-from src.repository.db.models import DocumentModel, AssignmentModel, FileModel
+from src.repository.db.models import DocumentModel, AssignmentModel, FileModel, DeliverableModel
 
 
 class DatabaseRepository(ABC):
@@ -137,5 +137,74 @@ class DatabaseRepository(ABC):
 
         Returns:
             A list of files for the assignment.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def store_deliverable(self, assignment_id: str, filename: str, content: bytes,
+                         extension: str, content_type: str, student_name: str = "Unknown",
+                         extracted_text: Optional[str] = None) -> str:
+        """Store a deliverable for an assignment.
+
+        Args:
+            assignment_id: The ID of the assignment.
+            filename: The name of the file.
+            content: The file content as bytes.
+            extension: The file extension.
+            content_type: The MIME type of the file.
+            student_name: The name of the student (default: "Unknown").
+            extracted_text: Optional extracted text from the document.
+
+        Returns:
+            The ID of the stored deliverable.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_deliverable(self, deliverable_id: str) -> Optional[DeliverableModel]:
+        """Retrieve a deliverable by its ID.
+
+        Args:
+            deliverable_id: The ID of the deliverable to retrieve.
+
+        Returns:
+            The deliverable model if found, otherwise None.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_deliverables_by_assignment(self, assignment_id: str) -> List[DeliverableModel]:
+        """List all deliverables for an assignment.
+
+        Args:
+            assignment_id: The ID of the assignment.
+
+        Returns:
+            A list of deliverables for the assignment.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_deliverable(self, deliverable_id: str, **kwargs: Any) -> bool:
+        """Update a deliverable.
+
+        Args:
+            deliverable_id: The ID of the deliverable to update.
+            **kwargs: Fields to update (student_name, mark, certainty_threshold, etc.).
+
+        Returns:
+            True if the deliverable was updated, False otherwise.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_deliverable(self, deliverable_id: str) -> bool:
+        """Delete a deliverable.
+
+        Args:
+            deliverable_id: The ID of the deliverable to delete.
+
+        Returns:
+            True if the deliverable was deleted, False otherwise.
         """
         raise NotImplementedError
