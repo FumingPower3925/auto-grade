@@ -1,4 +1,4 @@
-FROM quay.io/lib/python:3.13.7-slim AS base
+FROM quay.io/lib/python:3.14.0rc2-slim AS base
 
 RUN apt-get update && apt-get install -y \
     curl \
