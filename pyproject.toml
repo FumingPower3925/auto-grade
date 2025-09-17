@@ -33,6 +33,7 @@ httpx = "^0.28.1"
 mypy = "^1.18.1"
 playwright = "^1.55.0"
 pytest-playwright = "^0.7.1"
+pytest-asyncio = "^1.2.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

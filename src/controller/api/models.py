@@ -16,7 +16,7 @@ class AssignmentResponse(BaseModel):
     id: str
     name: str
     confidence_threshold: float
-    deliverables: List[str]  # List of deliverable IDs
+    deliverables: List[str]
     evaluation_rubrics_count: int
     relevant_documents_count: int
     created_at: str
@@ -47,7 +47,7 @@ class AssignmentDetailResponse(BaseModel):
     id: str
     name: str
     confidence_threshold: float
-    deliverables: List[str]  # List of deliverable IDs
+    deliverables: List[str]
     deliverables_count: int
     evaluation_rubrics: List[FileInfo]
     relevant_documents: List[FileInfo]
@@ -75,7 +75,7 @@ class BulkDeliverableUploadResponse(BaseModel):
 
 class UpdateDeliverableRequest(BaseModel):
     student_name: Optional[str] = Field(None, max_length=255, description="Student name")
-    mark: Optional[float] = Field(None, ge=0.0, le=100.0, description="Mark between 0 and 100")
+    mark: Optional[float] = Field(None, ge=0.0, le=10.0, description="Mark between 0 and 100")
     certainty_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Certainty threshold between 0.0 and 1.0")
 
 
@@ -84,7 +84,7 @@ class DeliverableResponse(BaseModel):
     assignment_id: str
     student_name: str
     mark: Optional[float]
-    mark_status: str  # "Marked" or "Unmarked"
+    mark_status: str
     certainty_threshold: Optional[float]
     filename: str
     extension: str

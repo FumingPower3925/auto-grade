@@ -3,11 +3,11 @@ from src.service.health_service import HealthService
 
 
 class TestHealthService:
-    """Unit tests for the HealthService."""
+    """Tests for HealthService."""
 
     @patch('src.service.health_service.get_database_repository')
-    def test_check_health_when_database_is_healthy(self, mock_get_repo: MagicMock) -> None:
-        """Test the health check when the database repository reports healthy."""
+    def test_check_health_when_healthy(self, mock_get_repo: MagicMock) -> None:
+        """Test health check when database is healthy."""
         mock_repo = MagicMock()
         mock_repo.health.return_value = True
         mock_get_repo.return_value = mock_repo
@@ -19,8 +19,8 @@ class TestHealthService:
         mock_repo.health.assert_called_once()
 
     @patch('src.service.health_service.get_database_repository')
-    def test_check_health_when_database_is_unhealthy(self, mock_get_repo: MagicMock) -> None:
-        """Test the health check when the database repository reports unhealthy."""
+    def test_check_health_when_unhealthy(self, mock_get_repo: MagicMock) -> None:
+        """Test health check when database is unhealthy."""
         mock_repo = MagicMock()
         mock_repo.health.return_value = False
         mock_get_repo.return_value = mock_repo
