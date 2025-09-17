@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
+import warnings
 from bson import ObjectId
 from typing import TypedDict, Literal
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from src.repository.db.ferretdb.repository import FerretDBRepository
 from src.repository.db.models import AssignmentModel, FileModel
 
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="coroutine .* was never awaited")
 
 class AssignmentDoc(TypedDict):
     _id: ObjectId
