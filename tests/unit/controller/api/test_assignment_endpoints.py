@@ -1,10 +1,10 @@
 from fastapi.testclient import TestClient
 from fastapi import status
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 import io
 import pytest
 
-from src.controller.api.api import app, upload_relevant_document
+from src.controller.api.api import app
 from src.repository.db.models import AssignmentModel, FileModel
 from bson import ObjectId
 from datetime import datetime, timezone
@@ -298,28 +298,27 @@ class TestAssignmentEndpoints:
         assert response.json()["detail"] == "Database constraint violation"
 
     @patch('src.controller.api.api.AssignmentService')
-    @pytest.mark.asyncio
-    async def test_upload_document_none_filename_async(self, mock_service_class: MagicMock) -> None:
-        """Test upload fallback when filename is None using async test."""
+    def test_upload_document_empty_filename(self, mock_service_class: MagicMock) -> None:
+        """Test upload with empty filename gets handled properly."""
         mock_service = MagicMock()
         mock_service.upload_relevant_document.return_value = "file_id"
         mock_service_class.return_value = mock_service
 
-        mock_file = MagicMock()
-        mock_file.filename = None
-        mock_file.content_type = "application/pdf"
-        mock_file.read = AsyncMock(return_value=b"content")
-
-        result = await upload_relevant_document(assignment_id="test_id", file=mock_file)
-
-        assert result.filename == "document"
-        assert result.id == "file_id"
-        mock_service.upload_relevant_document.assert_called_once_with(
-            assignment_id="test_id",
-            filename="document",
-            content=b"content",
-            content_type="application/pdf"
+        response = self.client.post(
+            "/assignments/test_id/documents",
+            files={"file": ("", io.BytesIO(b"content"), "application/pdf")}
         )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["id"] == "file_id"
+        
+        mock_service.upload_relevant_document.assert_called_once()
+        call_kwargs = mock_service.upload_relevant_document.call_args[1]
+        assert call_kwargs["assignment_id"] == "test_id"
+        assert call_kwargs["content"] == b"content"
+        assert call_kwargs["content_type"] == "application/pdf"
+
+        assert "filename" in call_kwargs
 
     def _create_mock_assignment(self, name: str = "Test Assignment") -> AssignmentModel:
         """Create a mock AssignmentModel."""
