@@ -99,11 +99,11 @@ class TestAssignmentWorkflow:
         assert response.content == doc_content
 
     @pytest.mark.parametrize("invalid_data,expected_status", [
-        ({"name": "", "confidence_threshold": 0.75}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({"name": "Test", "confidence_threshold": 1.5}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({"name": "Test", "confidence_threshold": -0.1}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({"confidence_threshold": 0.75}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({"name": "Test"}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({"name": "", "confidence_threshold": 0.75}, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        ({"name": "Test", "confidence_threshold": 1.5}, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        ({"name": "Test", "confidence_threshold": -0.1}, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        ({"confidence_threshold": 0.75}, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        ({"name": "Test"}, status.HTTP_422_UNPROCESSABLE_CONTENT),
     ])
     def test_assignment_validation(self, invalid_data: Dict[str, Any], expected_status: int) -> None:
         response = self.client.post("/assignments", json=invalid_data)

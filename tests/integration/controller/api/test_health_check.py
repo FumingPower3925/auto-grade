@@ -90,6 +90,6 @@ class TestHealthCheckIntegration:
             headers={"content-type": "text/plain"}
         )
         assert response.status_code in [
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
         ]

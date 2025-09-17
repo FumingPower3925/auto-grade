@@ -51,7 +51,7 @@ class TestDeliverableEndpoints:
             data={"extract_name": "false"}
         )
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "Invalid format" in response.json()["detail"]
 
     @patch('src.controller.api.api.DeliverableService')
@@ -170,7 +170,7 @@ class TestDeliverableEndpoints:
             data={"extract_names": "false"}
         )
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "No valid files provided" in response.json()["detail"]
 
     @patch('src.controller.api.api.DeliverableService')
@@ -274,7 +274,7 @@ class TestDeliverableEndpoints:
             json={"mark": 15.0}
         )
         
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "less than or equal to 10" in str(response.json()["detail"])
 
     @patch('src.controller.api.api.DeliverableService')

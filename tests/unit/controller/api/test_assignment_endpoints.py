@@ -3,6 +3,7 @@ from fastapi import status
 from unittest.mock import patch, MagicMock, AsyncMock
 import io
 import pytest
+import asyncio
 
 from src.controller.api.api import app, upload_relevant_document
 from src.repository.db.models import AssignmentModel, FileModel
@@ -298,9 +299,8 @@ class TestAssignmentEndpoints:
         assert response.json()["detail"] == "Database constraint violation"
 
     @patch('src.controller.api.api.AssignmentService')
-    @pytest.mark.asyncio
-    async def test_upload_document_none_filename_sync(self, mock_service_class: MagicMock) -> None:
-        """Test document upload with None filename (covers line 227) without using asyncio.run inside running loop."""
+    def test_upload_document_none_filename_sync(self, mock_service_class: MagicMock) -> None:
+        """Test upload fallback when filename is None by calling coroutine directly with isolated event loop."""
         mock_service = MagicMock()
         mock_service.upload_relevant_document.return_value = "file_id"
         mock_service_class.return_value = mock_service
@@ -310,14 +310,16 @@ class TestAssignmentEndpoints:
         mock_file.content_type = "application/pdf"
         mock_file.read = AsyncMock(return_value=b"content")
 
-        result = await upload_relevant_document(
-            assignment_id="test_id",
-            file=mock_file
-        )
+        loop = asyncio.new_event_loop()
+        try:
+            result = loop.run_until_complete(
+                upload_relevant_document(assignment_id="test_id", file=mock_file)
+            )
+        finally:
+            loop.close()
 
         assert result.filename == "document"
         assert result.id == "file_id"
-
         mock_service.upload_relevant_document.assert_called_once_with(
             assignment_id="test_id",
             filename="document",

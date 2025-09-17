@@ -105,8 +105,8 @@ class TestDeliverableWorkflow:
         (0.0, status.HTTP_200_OK),
         (5.5, status.HTTP_200_OK),
         (10.0, status.HTTP_200_OK),
-        (-0.1, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        (10.1, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        (-0.1, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        (10.1, status.HTTP_422_UNPROCESSABLE_CONTENT),
     ])
     def test_deliverable_mark_validation(self, mark: float, expected_status: int) -> None:
         response = self.client.post(
@@ -127,8 +127,8 @@ class TestDeliverableWorkflow:
         (0.0, status.HTTP_200_OK),
         (0.5, status.HTTP_200_OK),
         (1.0, status.HTTP_200_OK),
-        (-0.01, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        (1.01, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        (-0.01, status.HTTP_422_UNPROCESSABLE_CONTENT),
+        (1.01, status.HTTP_422_UNPROCESSABLE_CONTENT),
     ])
     def test_deliverable_certainty_validation(self, certainty: float, expected_status: int) -> None:
         response = self.client.post(
@@ -153,7 +153,7 @@ class TestDeliverableWorkflow:
                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
             data={"extract_name": "false"}
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert "not supported" in response.json()["detail"]
 
     def test_partial_deliverable_updates(self) -> None:
