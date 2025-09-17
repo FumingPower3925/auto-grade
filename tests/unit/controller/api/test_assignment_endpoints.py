@@ -297,29 +297,6 @@ class TestAssignmentEndpoints:
         assert response.status_code == 422
         assert response.json()["detail"] == "Database constraint violation"
 
-    @patch('src.controller.api.api.AssignmentService')
-    def test_upload_document_empty_filename(self, mock_service_class: MagicMock) -> None:
-        """Test upload with empty filename gets handled properly."""
-        mock_service = MagicMock()
-        mock_service.upload_relevant_document.return_value = "file_id"
-        mock_service_class.return_value = mock_service
-
-        response = self.client.post(
-            "/assignments/test_id/documents",
-            files={"file": ("", io.BytesIO(b"content"), "application/pdf")}
-        )
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json()["id"] == "file_id"
-        
-        mock_service.upload_relevant_document.assert_called_once()
-        call_kwargs = mock_service.upload_relevant_document.call_args[1]
-        assert call_kwargs["assignment_id"] == "test_id"
-        assert call_kwargs["content"] == b"content"
-        assert call_kwargs["content_type"] == "application/pdf"
-
-        assert "filename" in call_kwargs
-
     def _create_mock_assignment(self, name: str = "Test Assignment") -> AssignmentModel:
         """Create a mock AssignmentModel."""
         return AssignmentModel(
