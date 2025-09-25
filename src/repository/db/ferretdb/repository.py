@@ -13,6 +13,8 @@ from config.config import get_config
 from src.repository.db.base import DatabaseRepository
 from src.repository.db.models import AssignmentModel, DeliverableModel, DocumentModel, FileModel
 
+MONGO_PUSH = "$push"
+
 
 class FerretDBRepository(DatabaseRepository):
     def __init__(self) -> None:
@@ -148,11 +150,11 @@ class FerretDBRepository(DatabaseRepository):
 
             if file_type == "rubric":
                 self.assignments_collection.update_one(
-                    {"_id": obj_id}, {"$push": {"evaluation_rubrics": result.inserted_id}}
+                    {"_id": obj_id}, {MONGO_PUSH: {"evaluation_rubrics": result.inserted_id}}
                 )
             elif file_type == "relevant_document":
                 self.assignments_collection.update_one(
-                    {"_id": obj_id}, {"$push": {"relevant_documents": result.inserted_id}}
+                    {"_id": obj_id}, {MONGO_PUSH: {"relevant_documents": result.inserted_id}}
                 )
 
             return file_id
@@ -233,7 +235,7 @@ class FerretDBRepository(DatabaseRepository):
 
             self.assignments_collection.update_one(
                 {"_id": obj_id},
-                {"$push": {"deliverables": deliverable_id}, "$set": {"updated_at": datetime.now(UTC)}},
+                {MONGO_PUSH: {"deliverables": deliverable_id}, "$set": {"updated_at": datetime.now(UTC)}},
             )
 
             return str(deliverable_id)

@@ -24,6 +24,8 @@ from src.service.assignment_service import AssignmentService
 from src.service.deliverable_service import DeliverableService
 from src.service.health_service import HealthService
 
+DEFAULT_CONTENT_TYPE = "application/octet-stream"
+
 app = FastAPI(
     title="Auto Grade API",
     description="A PoC of an automatic bulk assignment grader LLM engine",
@@ -182,7 +184,7 @@ async def upload_rubric(assignment_id: str, file: Annotated[UploadFile, File(...
             assignment_id=assignment_id,
             filename=file.filename or "rubric",
             content=content,
-            content_type=file.content_type or "application/octet-stream",
+            content_type=file.content_type or DEFAULT_CONTENT_TYPE,
         )
 
         return FileUploadResponse(
@@ -208,7 +210,7 @@ async def upload_relevant_document(assignment_id: str, file: Annotated[UploadFil
             assignment_id=assignment_id,
             filename=file.filename or "document",
             content=content,
-            content_type=file.content_type or "application/octet-stream",
+            content_type=file.content_type or DEFAULT_CONTENT_TYPE,
         )
 
         return FileUploadResponse(
@@ -256,7 +258,7 @@ async def upload_deliverable(
     try:
         str_filename = str(file.filename)
         is_valid, error_msg = deliverable_service.validate_file_format(
-            str_filename, file.content_type or "application/octet-stream"
+            str_filename, file.content_type or DEFAULT_CONTENT_TYPE
         )
         if not is_valid:
             raise HTTPException(status_code=422, detail=error_msg)
@@ -269,7 +271,7 @@ async def upload_deliverable(
             filename=str_filename,
             content=content,
             extension=extension,
-            content_type=file.content_type or "application/octet-stream",
+            content_type=file.content_type or DEFAULT_CONTENT_TYPE,
             extract_name=extract_name,
         )
 
@@ -312,14 +314,14 @@ async def upload_multiple_deliverables(
         for file in files:
             if file.filename:
                 is_valid, error_msg = deliverable_service.validate_file_format(  # type: ignore
-                    file.filename, file.content_type or "application/octet-stream"
+                    file.filename, file.content_type or DEFAULT_CONTENT_TYPE
                 )
                 if not is_valid:
                     continue
 
                 content = await file.read()
                 extension = file.filename.split(".")[-1] if "." in file.filename else ""
-                files_data.append((file.filename, content, extension, file.content_type or "application/octet-stream"))
+                files_data.append((file.filename, content, extension, file.content_type or DEFAULT_CONTENT_TYPE))
 
         if not files_data:
             raise HTTPException(status_code=422, detail="No valid files provided")
