@@ -1,8 +1,10 @@
 import os
-from typing import Optional, Any
+import tomllib
+from typing import Any
+
 from pydantic import BaseModel
-import toml
-from config.models import ServerConfig, LLMConfig, DatabaseConfig
+
+from config.models import DatabaseConfig, LLMConfig, ServerConfig
 
 
 class Config(BaseModel):
@@ -17,13 +19,15 @@ class Config(BaseModel):
     def _load_toml_config(self) -> dict[str, Any]:
         config_path = os.path.join(os.path.dirname(__file__), "config.toml")
         if os.path.exists(config_path):
-            return toml.load(config_path)
+            with open(config_path, "rb") as f:
+                return tomllib.load(f)
         return {}
 
 
 class ConfigManager:
     """Singleton configuration manager."""
-    _instance: Optional[Config] = None
+
+    _instance: Config | None = None
 
     @classmethod
     def get_config(cls) -> Config:

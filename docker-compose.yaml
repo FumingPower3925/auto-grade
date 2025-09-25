@@ -63,19 +63,38 @@ services:
       - .env
     volumes:
       - ./config/config.toml:/app/config/config.toml:ro
-      - ./tests:/app/tests:ro
-      - ./config:/app/config:ro
-      - ./src:/app/src:ro
+      - ./tests:/app/tests
+      - ./config:/app/config
+      - ./src:/app/src
       - ./.coveragerc:/app/.coveragerc:ro
       - ./coverage:/app/coverage
     working_dir: /app
     profiles:
       - test
+    user: root
     depends_on:
       auto-grade:
         condition: service_healthy
       ferretdb:
         condition: service_healthy
+    networks:
+      - auto-grade-network
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+      cache_from:
+        - *base-image
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    working_dir: /app
+    profiles:
+      - dev
+    user: root
     networks:
       - auto-grade-network
 

@@ -72,7 +72,7 @@ RUN apt-get update && apt-get install -y \
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/pypoetry \
     pip install --no-cache-dir --timeout 300 pydantic-core==2.33.2 && \
-    poetry install --no-interaction --no-ansi
+    poetry install --with dev --no-interaction --no-ansi
 
 COPY config/ ./config/
 COPY src/ ./src/

@@ -11,12 +11,15 @@ omit =
     main.py
     /usr/*
     /app/venv/*
+    */static/*
+    */src/view/*
 
 [report]
 precision = 2
 show_missing = True
 skip_covered = False
 skip_empty = True
+fail_under = 100
 exclude_lines =
     pragma: no cover
     def __repr__

@@ -1,0 +1,71 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+    
+    - name: Run Trivy vulnerability scanner for filesystem
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+    
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Run Trivy for Docker image
+      run: |
+        cp .env.example .env
+        echo "OPENAI_API_KEY=dummy_key" >> .env
+        docker compose build auto-grade
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+          aquasec/trivy image auto-grade:latest --severity HIGH,CRITICAL
+      continue-on-error: true
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install and run safety check
+      run: |
+        pip install safety
+        pip install poetry
+        poetry export -f requirements.txt --without-hashes | safety check --stdin
+      continue-on-error: true
+    
+    - name: Run bandit security linter
+      run: |
+        pip install bandit[toml]
+        bandit -r src/ -f json -o bandit-security-report.json
+        bandit -r src/ -f txt
+      continue-on-error: true
+    
+    - name: Upload security artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          trivy-results.sarif
+          bandit-security-report.json
+        retention-days: 30
