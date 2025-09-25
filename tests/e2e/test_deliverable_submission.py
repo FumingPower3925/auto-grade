@@ -12,7 +12,7 @@ class TestDeliverableSubmissionE2E:
     @pytest.fixture(autouse=True)
     def setup_test_assignment(self, page: Page) -> None:
         """Create a test assignment for deliverable tests."""
-        self.base_url = os.getenv("PLAYWRIGHT_BASE_URL", "http://auto-grade:8080")
+        self.base_url = os.getenv("PLAYWRIGHT_BASE_URL", "http://auto-grade:8080") # NOSONAR
         page.goto(self.base_url)
         self.page = page
 

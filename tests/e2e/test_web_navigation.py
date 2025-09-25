@@ -11,7 +11,7 @@ class TestWebNavigationE2E:
     @pytest.fixture(autouse=True)
     def setup_page(self, page: Page) -> None:
         """Navigate to application before each test."""
-        self.base_url = os.getenv("PLAYWRIGHT_BASE_URL", "http://auto-grade:8080")
+        self.base_url = os.getenv("PLAYWRIGHT_BASE_URL", "http://auto-grade:8080") # NOSONAR
         page.goto(self.base_url)
         self.page = page
 
