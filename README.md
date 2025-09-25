@@ -30,7 +30,7 @@ A PoC of an automatic bulk assignment grader LLM engine
 | **Code Coverage** | ![Coverage](https://img.shields.io/codecov/c/github/FumingPower3925/auto-grade) - **100% Required** |
 | **Code Quality** | [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=FumingPower3925_auto-grade&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=FumingPower3925_auto-grade) |
 | **Technical Debt** | [![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=FumingPower3925_auto-grade&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=FumingPower3925_auto-grade) |
-| **Dependencies** | ![Dependencies](https://img.shields.io/librariesio/github/FumingPower3925/auto-grade) |
+| **Dependencies** | ![Dependencies](https://img.shields.io/librariesio/github/FumingPower3925/auto-grade) - Deactivated, waiting for [#784](https://github.com/pyupio/safety/issues/784)
 | **Last Commit** | ![Last Commit](https://img.shields.io/github/last-commit/FumingPower3925/auto-grade) |
 
 </div>
