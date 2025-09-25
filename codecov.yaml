@@ -1,29 +1,31 @@
 codecov:
   require_ci_to_pass: true
   bot: "codecov-io"
+  max_report_age: 24h
+  disable_default_path_fixes: false
 
 coverage:
   precision: 2
   round: down
-  range: "70...100"
+  range: "100...100"
   
   status:
     project:
       default:
-        target: 80%
-        threshold: 2%
+        target: 100%
+        threshold: 0%
         base: auto
-        if_not_found: success
+        if_not_found: failure
         if_ci_failed: error
         informational: false
         only_pulls: false
     
     patch:
       default:
-        target: 80%
-        threshold: 2%
+        target: 100%
+        threshold: 0%
         base: auto
-        if_not_found: success
+        if_not_found: failure
         if_ci_failed: error
         informational: false
         only_pulls: false
@@ -43,6 +45,7 @@ comment:
   require_base: false
   require_head: true
   hide_project_coverage: false
+  after_n_builds: 1
 
 ignore:
   - "tests/**/*"
@@ -60,3 +63,4 @@ flags:
       - src/
       - config/
     carryforward: true
+    target: 100%

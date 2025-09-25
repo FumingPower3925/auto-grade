@@ -1,4 +1,4 @@
-name: Test and Coverage
+name: CI Pipeline
 
 on:
   push:
@@ -7,14 +7,39 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install ruff mypy
+    
+    - name: Run Ruff linter
+      run: ruff check . --config pyproject.toml || true
+    
+    - name: Run Ruff formatter check
+      run: ruff format . --check --config pyproject.toml || true
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    needs: lint
     permissions:
       pull-requests: write
       contents: write
-      issues: write
-      checks: write
     
     steps:
     - name: Checkout code
@@ -31,44 +56,50 @@ jobs:
     - name: Build test image
       run: docker compose build test
     
-    - name: Run tests with coverage
+    - name: Run unit tests with coverage
       run: |
         mkdir -p coverage
         chmod 777 coverage
-        docker compose run --rm test python -m pytest tests/ \
+        docker compose run --rm test python -m pytest tests/unit/ \
           --cov=src \
           --cov=config \
           --cov-report=xml:/app/coverage/coverage.xml \
           --cov-report=term \
           --cov-report=html:/app/coverage/htmlcov \
+          --cov-fail-under=100 \
           -v
         
-        # Fix coverage paths for GitHub Actions
         if [ -f coverage/coverage.xml ]; then
           sed -i 's|/app/|./|g' coverage/coverage.xml
         fi
     
-    - name: Upload coverage reports to Codecov
+    - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
-        file: ./coverage/coverage.xml
+        files: ./coverage/coverage.xml
         flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+        name: unit-coverage
+        fail_ci_if_error: true
         token: ${{ secrets.CODECOV_TOKEN }}
+    
+    - name: Generate coverage badge
+      run: |
+        COVERAGE=$(docker compose run --rm test python -c "import xml.etree.ElementTree as ET; root = ET.parse('/app/coverage/coverage.xml').getroot(); print(f\"{float(root.get('line-rate', 0)) * 100:.1f}\")" 2>/dev/null || echo "0")
+        echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
     
     - name: Upload coverage artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: coverage-report
+        name: unit-coverage-report
         path: |
           coverage/coverage.xml
           coverage/htmlcov/
         retention-days: 30
 
-  integration-test:
+  integration-tests:
     runs-on: ubuntu-latest
+    needs: lint
     
     steps:
     - name: Checkout code
@@ -82,58 +113,98 @@ jobs:
         cp .env.example .env
         echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY || 'dummy_key_for_testing' }}" >> .env
     
-    - name: Build production image
-      run: docker compose build auto-grade
-    
-    - name: Start services
-      run: docker compose up -d auto-grade
-    
-    - name: Wait for service to be ready
+    - name: Build and start services
       run: |
-        echo "Waiting for service to start..."
-        sleep 10
+        docker compose up -d auto-grade ferretdb
         
         max_attempts=30
         attempt=1
         
         while [ $attempt -le $max_attempts ]; do
-          echo "Health check attempt $attempt/$max_attempts..."
+          if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
+            echo "Service is ready!"
+            break
+          fi
           
-          # Check if container is running
-          if ! docker compose ps | grep -q "auto-grade.*Up"; then
-            echo "Container is not running. Checking logs..."
-            docker compose logs auto-grade
-            docker compose ps
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Service failed to start"
+            docker compose logs
             exit 1
           fi
           
-          if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
-            echo "Service is healthy!"
-            exit 0
-          fi
-          
-          echo "Service not ready yet, waiting..."
           sleep 3
           attempt=$((attempt + 1))
         done
-        
-        echo "Service did not become ready in time"
-        echo "Container status:"
-        docker compose ps
-        echo "Container logs:"
-        docker compose logs auto-grade
-        exit 1
     
-    - name: Test health endpoint
+    - name: Run integration tests
       run: |
-        curl -f http://localhost:8080/api/health || exit 1
-        echo "Health check passed!"
+        docker compose run --rm test python -m pytest tests/integration/ -v --tb=short
     
     - name: View logs on failure
       if: failure()
+      run: docker compose logs
+    
+    - name: Stop services
+      if: always()
+      run: docker compose down
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Create .env file
       run: |
-        docker compose logs auto-grade
-        docker compose ps
+        cp .env.example .env
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY || 'dummy_key_for_testing' }}" >> .env
+    
+    - name: Build and start application
+      run: |
+        docker compose up -d auto-grade ferretdb
+        
+        max_attempts=30
+        attempt=1
+        
+        while [ $attempt -le $max_attempts ]; do
+          if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
+            echo "Application ready for E2E tests!"
+            break
+          fi
+          
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Application failed to start"
+            docker compose logs
+            exit 1
+          fi
+          
+          sleep 3
+          attempt=$((attempt + 1))
+        done
+    
+    - name: Run E2E tests
+      run: |
+        docker compose run --rm \
+          -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 \
+          test python -m pytest tests/e2e/ -v \
+          --browser chromium \
+          --screenshot=only-on-failure \
+          --video=retain-on-failure
+    
+    - name: Upload E2E test artifacts
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: e2e-test-results
+        path: |
+          test-results/
+          screenshots/
+        retention-days: 7
     
     - name: Stop services
       if: always()
@@ -141,6 +212,7 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
+    needs: lint
     strategy:
       matrix:
         target: [production, test]
@@ -166,69 +238,21 @@ jobs:
         tags: auto-grade:${{ matrix.target }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
 
-  e2e-test:
+  ci-status:
     runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, e2e-tests, docker-build]
+    if: always()
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Create .env file
+    - name: Check CI Status
       run: |
-        cp .env.example .env
-        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY || 'dummy_key_for_testing' }}" >> .env
-    
-    - name: Build images
-      run: |
-        docker compose build auto-grade
-        docker compose build test
-    
-    - name: Start application for E2E tests
-      run: |
-        docker compose up -d auto-grade
-        
-        # Wait for service to be ready
-        max_attempts=30
-        attempt=1
-        
-        while [ $attempt -le $max_attempts ]; do
-          echo "E2E setup - Health check attempt $attempt/$max_attempts..."
-          
-          if ! docker compose ps | grep -q "auto-grade.*Up"; then
-            echo "Container is not running. Checking logs..."
-            docker compose logs auto-grade
-            exit 1
-          fi
-          
-          if curl -fsS http://localhost:8080/api/health >/dev/null 2>&1; then
-            echo "Service is ready for E2E tests!"
-            break
-          fi
-          
-          if [ $attempt -eq $max_attempts ]; then
-            echo "Service did not become ready for E2E tests"
-            docker compose logs auto-grade
-            exit 1
-          fi
-          
-          sleep 3
-          attempt=$((attempt + 1))
-        done
-    
-    - name: Run E2E tests
-      run: |
-        docker compose run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test python -m pytest tests/e2e/ -v --browser chromium
-    
-    - name: View logs on E2E failure
-      if: failure()
-      run: |
-        docker compose logs auto-grade
-        docker compose ps
-    
-    - name: Stop services after E2E tests
-      if: always()
-      run: docker compose down
+        if [ "${{ needs.unit-tests.result }}" != "success" ] || \
+           [ "${{ needs.integration-tests.result }}" != "success" ] || \
+           [ "${{ needs.e2e-tests.result }}" != "success" ] || \
+           [ "${{ needs.docker-build.result }}" != "success" ]; then
+          echo "CI Pipeline failed"
+          exit 1
+        fi
+        echo "All CI checks passed successfully!"

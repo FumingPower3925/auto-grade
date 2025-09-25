@@ -1,4 +1,3 @@
-from typing import List, Optional
 from src.repository.db.factory import get_database_repository
 from src.repository.db.models import AssignmentModel, FileModel
 
@@ -21,13 +20,13 @@ class AssignmentService:
         """
         if not name or len(name) > 255:
             raise ValueError("Assignment name must be between 1 and 255 characters")
-        
+
         if not 0.0 <= confidence_threshold <= 1.0:
             raise ValueError("Confidence threshold must be between 0.0 and 1.0")
-        
+
         return self.db_repository.create_assignment(name, confidence_threshold)
 
-    def get_assignment(self, assignment_id: str) -> Optional[AssignmentModel]:
+    def get_assignment(self, assignment_id: str) -> AssignmentModel | None:
         """Get an assignment by ID.
 
         Args:
@@ -38,7 +37,7 @@ class AssignmentService:
         """
         return self.db_repository.get_assignment(assignment_id)
 
-    def list_assignments(self) -> List[AssignmentModel]:
+    def list_assignments(self) -> list[AssignmentModel]:
         """List all assignments.
 
         Returns:
@@ -57,8 +56,7 @@ class AssignmentService:
         """
         return self.db_repository.delete_assignment(assignment_id)
 
-    def upload_rubric(self, assignment_id: str, filename: str, content: bytes, 
-                     content_type: str) -> str:
+    def upload_rubric(self, assignment_id: str, filename: str, content: bytes, content_type: str) -> str:
         """Upload an evaluation rubric for an assignment.
 
         Args:
@@ -73,13 +71,10 @@ class AssignmentService:
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
-        
-        return self.db_repository.store_file(
-            assignment_id, filename, content, content_type, "rubric"
-        )
 
-    def upload_relevant_document(self, assignment_id: str, filename: str, 
-                                content: bytes, content_type: str) -> str:
+        return self.db_repository.store_file(assignment_id, filename, content, content_type, "rubric")
+
+    def upload_relevant_document(self, assignment_id: str, filename: str, content: bytes, content_type: str) -> str:
         """Upload a relevant document or example for an assignment.
 
         Args:
@@ -94,12 +89,10 @@ class AssignmentService:
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
-        
-        return self.db_repository.store_file(
-            assignment_id, filename, content, content_type, "relevant_document"
-        )
 
-    def get_file(self, file_id: str) -> Optional[FileModel]:
+        return self.db_repository.store_file(assignment_id, filename, content, content_type, "relevant_document")
+
+    def get_file(self, file_id: str) -> FileModel | None:
         """Get a file by ID.
 
         Args:
@@ -110,7 +103,7 @@ class AssignmentService:
         """
         return self.db_repository.get_file(file_id)
 
-    def list_rubrics(self, assignment_id: str) -> List[FileModel]:
+    def list_rubrics(self, assignment_id: str) -> list[FileModel]:
         """List evaluation rubrics for an assignment.
 
         Args:
@@ -121,7 +114,7 @@ class AssignmentService:
         """
         return self.db_repository.list_files_by_assignment(assignment_id, "rubric")
 
-    def list_relevant_documents(self, assignment_id: str) -> List[FileModel]:
+    def list_relevant_documents(self, assignment_id: str) -> list[FileModel]:
         """List relevant documents for an assignment.
 
         Args:

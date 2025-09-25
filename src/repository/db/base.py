@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List, Any
-from src.repository.db.models import DocumentModel, AssignmentModel, FileModel, DeliverableModel
+from typing import Any
+
+from src.repository.db.models import AssignmentModel, DeliverableModel, DocumentModel, FileModel
 
 
 class DatabaseRepository(ABC):
@@ -12,7 +13,9 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def store_document(self, assignment: str, deliverable: str, student_name: str, document: bytes, extension: str) -> str:
+    def store_document(
+        self, assignment: str, deliverable: str, student_name: str, document: bytes, extension: str
+    ) -> str:
         """Store a document in the database.
 
         Args:
@@ -28,7 +31,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_document(self, document_id: str) -> Optional[DocumentModel]:
+    def get_document(self, document_id: str) -> DocumentModel | None:
         """Retrieve a document from the database by its ID.
 
         Args:
@@ -53,7 +56,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_assignment(self, assignment_id: str) -> Optional[AssignmentModel]:
+    def get_assignment(self, assignment_id: str) -> AssignmentModel | None:
         """Retrieve an assignment by its ID.
 
         Args:
@@ -65,7 +68,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list_assignments(self) -> List[AssignmentModel]:
+    def list_assignments(self) -> list[AssignmentModel]:
         """List all assignments.
 
         Returns:
@@ -99,8 +102,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def store_file(self, assignment_id: str, filename: str, content: bytes, 
-                   content_type: str, file_type: str) -> str:
+    def store_file(self, assignment_id: str, filename: str, content: bytes, content_type: str, file_type: str) -> str:
         """Store a file related to an assignment.
 
         Args:
@@ -116,7 +118,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_file(self, file_id: str) -> Optional[FileModel]:
+    def get_file(self, file_id: str) -> FileModel | None:
         """Retrieve a file by its ID.
 
         Args:
@@ -128,7 +130,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list_files_by_assignment(self, assignment_id: str, file_type: Optional[str] = None) -> List[FileModel]:
+    def list_files_by_assignment(self, assignment_id: str, file_type: str | None = None) -> list[FileModel]:
         """List files for an assignment.
 
         Args:
@@ -141,9 +143,16 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def store_deliverable(self, assignment_id: str, filename: str, content: bytes,
-                         extension: str, content_type: str, student_name: str = "Unknown",
-                         extracted_text: Optional[str] = None) -> str:
+    def store_deliverable(
+        self,
+        assignment_id: str,
+        filename: str,
+        content: bytes,
+        extension: str,
+        content_type: str,
+        student_name: str = "Unknown",
+        extracted_text: str | None = None,
+    ) -> str:
         """Store a deliverable for an assignment.
 
         Args:
@@ -161,7 +170,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_deliverable(self, deliverable_id: str) -> Optional[DeliverableModel]:
+    def get_deliverable(self, deliverable_id: str) -> DeliverableModel | None:
         """Retrieve a deliverable by its ID.
 
         Args:
@@ -173,7 +182,7 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list_deliverables_by_assignment(self, assignment_id: str) -> List[DeliverableModel]:
+    def list_deliverables_by_assignment(self, assignment_id: str) -> list[DeliverableModel]:
         """List all deliverables for an assignment.
 
         Args:

@@ -9,6 +9,7 @@ def get_database_repository() -> DatabaseRepository:
 
     if db_type == "ferretdb":
         from src.repository.db.ferretdb.repository import FerretDBRepository
+
         return FerretDBRepository()
     else:
         raise ValueError(f"Unsupported database type: {db_type}")

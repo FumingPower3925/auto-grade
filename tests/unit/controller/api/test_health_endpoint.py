@@ -1,6 +1,7 @@
-from fastapi.testclient import TestClient
+from unittest.mock import MagicMock, patch
+
 from fastapi import status
-from unittest.mock import patch, MagicMock
+from fastapi.testclient import TestClient
 
 from src.controller.api.api import app
 from src.controller.api.models import HealthResponse
@@ -12,25 +13,25 @@ class TestHealthEndpoint:
     def setup_method(self) -> None:
         self.client = TestClient(app)
 
-    @patch('src.service.health_service.HealthService.check_health')
+    @patch("src.service.health_service.HealthService.check_health")
     def test_health_check_healthy(self, mock_check_health: MagicMock) -> None:
         """Test health endpoint when service is healthy."""
         mock_check_health.return_value = True
-        
+
         response = self.client.get("/health")
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "healthy"
         assert data["message"] == "Auto Grade API is running and connected to the database"
 
-    @patch('src.service.health_service.HealthService.check_health')
+    @patch("src.service.health_service.HealthService.check_health")
     def test_health_check_unhealthy(self, mock_check_health: MagicMock) -> None:
         """Test health endpoint when service is unhealthy."""
         mock_check_health.return_value = False
-        
+
         response = self.client.get("/health")
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "unhealthy"
@@ -38,16 +39,16 @@ class TestHealthEndpoint:
 
     def test_health_endpoint_validates_response_model(self) -> None:
         """Test that health response validates against HealthResponse model."""
-        with patch('src.service.health_service.HealthService.check_health', return_value=True):
+        with patch("src.service.health_service.HealthService.check_health", return_value=True):
             response = self.client.get("/health")
             data = response.json()
-            
+
             health_response = HealthResponse(**data)
             assert health_response.status == "healthy"
 
     def test_health_endpoint_with_head_method(self) -> None:
         """Test HEAD request to health endpoint."""
-        with patch('src.service.health_service.HealthService.check_health', return_value=True):
+        with patch("src.service.health_service.HealthService.check_health", return_value=True):
             response = self.client.head("/health")
             assert response.status_code == status.HTTP_200_OK
 
@@ -58,9 +59,9 @@ class TestHealthEndpoint:
 
     def test_health_endpoint_headers(self) -> None:
         """Test health endpoint response headers."""
-        with patch('src.service.health_service.HealthService.check_health', return_value=True):
+        with patch("src.service.health_service.HealthService.check_health", return_value=True):
             response = self.client.get("/health")
-            
+
             assert response.status_code == status.HTTP_200_OK
             assert "application/json" in response.headers["content-type"]
             assert "content-length" in response.headers
@@ -88,7 +89,7 @@ class TestAPIMetadata:
         """Test OpenAPI schema is accessible."""
         response = self.client.get("/openapi.json")
         assert response.status_code == status.HTTP_200_OK
-        
+
         schema = response.json()
         assert "openapi" in schema
         assert schema["info"]["title"] == "Auto Grade API"
@@ -103,7 +104,7 @@ class TestAPIMetadata:
         """Test health route has correct OpenAPI tags."""
         response = self.client.get("/openapi.json")
         schema = response.json()
-        
+
         health_path = schema["paths"]["/health"]["get"]
         assert "Health" in health_path["tags"]
         assert "200" in health_path["responses"]

@@ -1,0 +1,69 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install poetry
+        poetry install --only dev
+    
+    - name: Run mypy type checking
+      run: poetry run mypy src/ config/ --ignore-missing-imports
+      continue-on-error: true
+    
+    - name: Run bandit security check
+      run: |
+        pip install bandit[toml]
+        bandit -r src/ -ll -i -f json -o bandit-report.json || true
+    
+    - name: Run safety check
+      run: |
+        pip install safety
+        safety check --json > safety-report.json || true
+    
+    - name: Set up Docker for tests
+      run: |
+        cp .env.example .env
+        echo "OPENAI_API_KEY=dummy_key" >> .env
+        docker compose build test
+    
+    - name: Run tests for SonarCloud coverage
+      run: |
+        mkdir -p coverage
+        chmod 777 coverage
+        docker compose run --rm test python -m pytest tests/unit/ \
+          --cov=src \
+          --cov=config \
+          --cov-report=xml:/app/coverage/coverage.xml \
+          -v || true
+        
+        if [ -f coverage/coverage.xml ]; then
+          sed -i 's|/app/|./|g' coverage/coverage.xml
+        fi
+    
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      continue-on-error: true
