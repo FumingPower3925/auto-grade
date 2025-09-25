@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
 
 
 class HealthResponse(BaseModel):
@@ -16,7 +15,7 @@ class AssignmentResponse(BaseModel):
     id: str
     name: str
     confidence_threshold: float
-    deliverables: List[str]
+    deliverables: list[str]
     evaluation_rubrics_count: int
     relevant_documents_count: int
     created_at: str
@@ -24,7 +23,7 @@ class AssignmentResponse(BaseModel):
 
 
 class AssignmentListResponse(BaseModel):
-    assignments: List[AssignmentResponse]
+    assignments: list[AssignmentResponse]
     total: int
 
 
@@ -47,10 +46,10 @@ class AssignmentDetailResponse(BaseModel):
     id: str
     name: str
     confidence_threshold: float
-    deliverables: List[str]
+    deliverables: list[str]
     deliverables_count: int
-    evaluation_rubrics: List[FileInfo]
-    relevant_documents: List[FileInfo]
+    evaluation_rubrics: list[FileInfo]
+    relevant_documents: list[FileInfo]
     created_at: str
     updated_at: str
 
@@ -68,24 +67,26 @@ class DeliverableUploadResponse(BaseModel):
 
 
 class BulkDeliverableUploadResponse(BaseModel):
-    deliverables: List[DeliverableUploadResponse]
+    deliverables: list[DeliverableUploadResponse]
     total_uploaded: int
     message: str
 
 
 class UpdateDeliverableRequest(BaseModel):
-    student_name: Optional[str] = Field(None, max_length=255, description="Student name")
-    mark: Optional[float] = Field(None, ge=0.0, le=10.0, description="Mark between 0 and 100")
-    certainty_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Certainty threshold between 0.0 and 1.0")
+    student_name: str | None = Field(None, max_length=255, description="Student name")
+    mark: float | None = Field(None, ge=0.0, le=10.0, description="Mark between 0 and 100")
+    certainty_threshold: float | None = Field(
+        None, ge=0.0, le=1.0, description="Certainty threshold between 0.0 and 1.0"
+    )
 
 
 class DeliverableResponse(BaseModel):
     id: str
     assignment_id: str
     student_name: str
-    mark: Optional[float]
+    mark: float | None
     mark_status: str
-    certainty_threshold: Optional[float]
+    certainty_threshold: float | None
     filename: str
     extension: str
     content_type: str
@@ -95,7 +96,7 @@ class DeliverableResponse(BaseModel):
 
 
 class DeliverableListResponse(BaseModel):
-    deliverables: List[DeliverableResponse]
+    deliverables: list[DeliverableResponse]
     total: int
 
 

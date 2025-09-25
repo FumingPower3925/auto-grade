@@ -1,9 +1,10 @@
-import pytest
-from pydantic import ValidationError
-from bson import ObjectId
 from datetime import datetime
 
-from src.repository.db.models import PyObjectId, DocumentModel, FileModel
+import pytest
+from bson import ObjectId
+from pydantic import ValidationError
+
+from src.repository.db.models import DocumentModel, FileModel, PyObjectId
 
 
 class TestPyObjectId:
@@ -24,7 +25,7 @@ class TestPyObjectId:
     def test_validate_object_id_instance(self) -> None:
         """Test validating an existing ObjectId instance."""
         obj_id = ObjectId()
-        validated_id = PyObjectId.validate(obj_id) # type: ignore
+        validated_id = PyObjectId.validate(obj_id)  # type: ignore
         assert validated_id == obj_id
 
 
@@ -34,16 +35,16 @@ class TestDocumentModel:
     def test_create_document_model(self) -> None:
         """Test creating a DocumentModel."""
         doc_id = ObjectId()
-        
+
         document = DocumentModel(
             _id=doc_id,
             assignment="test_assignment",
             deliverable="test_deliverable",
             student_name="John Doe",
             document=b"test content",
-            extension="txt"
+            extension="txt",
         )
-        
+
         assert document.id == doc_id
         assert document.assignment == "test_assignment"
         assert document.deliverable == "test_deliverable"
@@ -59,9 +60,9 @@ class TestDocumentModel:
             "deliverable": "test",
             "student_name": "test",
             "document": b"test",
-            "extension": "txt"
+            "extension": "txt",
         }
-        
+
         with pytest.raises(ValidationError):
             DocumentModel.model_validate(invalid_data)
 
@@ -75,25 +76,20 @@ class TestDocumentModel:
             "deliverable": "test",
             "student_name": "test",
             "document": b"test",
-            "extension": "txt"
+            "extension": "txt",
         }
-        
+
         document = DocumentModel.model_validate(data)
         assert str(document.id) == valid_id
 
     def test_document_id_serialization(self) -> None:
         """Test that document ID is serialized to string."""
         doc_id = ObjectId()
-        
+
         document = DocumentModel(
-            _id=doc_id,
-            assignment="test",
-            deliverable="test",
-            student_name="test",
-            document=b"test",
-            extension="txt"
+            _id=doc_id, assignment="test", deliverable="test", student_name="test", document=b"test", extension="txt"
         )
-        
+
         dump = document.model_dump()
         assert dump["id"] == str(doc_id)
 
@@ -106,7 +102,7 @@ class TestFileModel:
         file_id = ObjectId()
         assignment_id = ObjectId()
         now = datetime.now()
-        
+
         file_model = FileModel(
             _id=file_id,
             assignment_id=assignment_id,
@@ -114,9 +110,9 @@ class TestFileModel:
             content=b"test content",
             content_type="application/pdf",
             file_type="rubric",
-            uploaded_at=now
+            uploaded_at=now,
         )
-        
+
         assert file_model.id == file_id
         assert file_model.assignment_id == assignment_id
         assert file_model.filename == "test.pdf"
@@ -128,15 +124,15 @@ class TestFileModel:
     def test_file_model_with_defaults(self) -> None:
         """Test creating FileModel with default values."""
         assignment_id = ObjectId()
-        
+
         file_model = FileModel(
             assignment_id=assignment_id,
             filename="test.txt",
             content=b"content",
             content_type="text/plain",
-            file_type="document"
+            file_type="document",
         )
-        
+
         assert isinstance(file_model.id, ObjectId)
         assert isinstance(file_model.uploaded_at, datetime)
 
@@ -144,16 +140,16 @@ class TestFileModel:
         """Test that FileModel ObjectIds are serialized to strings."""
         file_id = ObjectId()
         assignment_id = ObjectId()
-        
+
         file_model = FileModel(
             _id=file_id,
             assignment_id=assignment_id,
             filename="test.txt",
             content=b"test",
             content_type="text/plain",
-            file_type="rubric"
+            file_type="rubric",
         )
-        
+
         dump = file_model.model_dump()
         assert dump["id"] == str(file_id)
         assert dump["assignment_id"] == str(assignment_id)
@@ -161,15 +157,15 @@ class TestFileModel:
     def test_file_datetime_serialization(self) -> None:
         """Test that FileModel datetime is serialized to ISO format."""
         now = datetime.now()
-        
+
         file_model = FileModel(
             assignment_id=ObjectId(),
             filename="test.txt",
             content=b"test",
             content_type="text/plain",
             file_type="rubric",
-            uploaded_at=now
+            uploaded_at=now,
         )
-        
+
         dump = file_model.model_dump()
         assert dump["uploaded_at"] == now.isoformat()

@@ -1,12 +1,11 @@
 import pytest
 
-from src.repository.db.factory import get_database_repository
 from src.repository.db.base import DatabaseRepository
+from src.repository.db.factory import get_database_repository
 from src.repository.db.models import DocumentModel
 
 
 class TestFerretDBIntegration:
-
     @pytest.fixture(scope="class")
     def repo(self) -> DatabaseRepository:
         return get_database_repository()
@@ -20,12 +19,12 @@ class TestFerretDBIntegration:
             deliverable="test_deliverable",
             student_name="Test Student",
             document=b"Test document content",
-            extension="pdf"
+            extension="pdf",
         )
-        
+
         assert isinstance(doc_id, str)
         assert len(doc_id) > 0
-        
+
         document = repo.get_document(doc_id)
         assert document is not None
         assert isinstance(document, DocumentModel)
@@ -42,17 +41,17 @@ class TestFerretDBIntegration:
 
     def test_multiple_document_operations(self, repo: DatabaseRepository) -> None:
         doc_ids: list[str] = []
-        
+
         for i in range(5):
             doc_id = repo.store_document(
                 assignment=f"assignment_{i}",
                 deliverable=f"deliverable_{i}",
                 student_name=f"Student {i}",
                 document=f"Content {i}".encode(),
-                extension="txt"
+                extension="txt",
             )
             doc_ids.append(doc_id)
-        
+
         for i, doc_id in enumerate(doc_ids):
             document = repo.get_document(doc_id)
             assert document is not None
@@ -61,15 +60,15 @@ class TestFerretDBIntegration:
 
     def test_document_with_binary_content(self, repo: DatabaseRepository) -> None:
         binary_content = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
-        
+
         doc_id = repo.store_document(
             assignment="binary_test",
             deliverable="binary_deliverable",
             student_name="Binary Test",
             document=binary_content,
-            extension="pdf"
+            extension="pdf",
         )
-        
+
         document = repo.get_document(doc_id)
         assert document is not None
         assert document.document == binary_content
@@ -81,9 +80,9 @@ class TestFerretDBIntegration:
             deliverable="Test's Deliverable",
             student_name="João São Paulo",
             document=b"Content with special chars: \xe2\x98\x85",
-            extension="txt"
+            extension="txt",
         )
-        
+
         document = repo.get_document(doc_id)
         assert document is not None
         assert document.assignment == "Test & Assignment"
@@ -92,15 +91,15 @@ class TestFerretDBIntegration:
 
     def test_large_document_handling(self, repo: DatabaseRepository) -> None:
         large_content = b"x" * (1024 * 1024)
-        
+
         doc_id = repo.store_document(
             assignment="large_test",
             deliverable="large_deliverable",
             student_name="Large Test",
             document=large_content,
-            extension="bin"
+            extension="bin",
         )
-        
+
         document = repo.get_document(doc_id)
         assert document is not None
         assert len(document.document) == 1024 * 1024
