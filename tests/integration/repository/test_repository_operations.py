@@ -146,11 +146,11 @@ class TestRepositoryOperations:
                 assert updated.mark is not None
                 assert math.isclose(updated.mark, 8.5, rel_tol=1e-6, abs_tol=1e-12)
 
-        success = repo.delete_deliverable(deliverable_id)
+        repo.delete_deliverable(deliverable_id)
 
         deleted = repo.get_deliverable(deliverable_id)
         if deleted is None:
-            deleted = repo.get_file(deliverable_id)
+            repo.get_file(deliverable_id)
 
     def test_deliverable_listing_by_assignment(self, repo: DatabaseRepository, cleanup_assignments: list[str]) -> None:
         assignment_id = repo.create_assignment("Deliverable List Test", 0.75)
