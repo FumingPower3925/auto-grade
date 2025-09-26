@@ -1,6 +1,6 @@
 import datetime as datetime
 import io
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -294,6 +294,47 @@ async def upload_deliverable(
         raise HTTPException(status_code=500, detail="Failed to upload deliverable") from e
 
 
+async def prepare_file_data(
+    file: UploadFile, deliverable_service: DeliverableService
+) -> tuple[str, bytes, str, str] | None:
+    """Prepare file data for upload if valid.
+
+    Returns tuple of (filename, content, extension, content_type) or None if invalid.
+    """
+    if not file.filename:
+        return None
+
+    content_type = file.content_type or DEFAULT_CONTENT_TYPE
+    is_valid, _ = deliverable_service.validate_file_format(file.filename, content_type)
+
+    if not is_valid:
+        return None
+
+    content = await file.read()
+    extension = file.filename.split(".")[-1] if "." in file.filename else ""
+    return (file.filename, content, extension, content_type)
+
+
+def create_deliverable_response(
+    deliverable_id: str, deliverable_service: DeliverableService
+) -> DeliverableUploadResponse | None:
+    """Create a DeliverableUploadResponse from a deliverable ID.
+
+    Returns the response or None if deliverable not found.
+    """
+    deliverable = deliverable_service.get_deliverable(deliverable_id)
+    if not deliverable:
+        return None
+
+    return DeliverableUploadResponse(
+        id=deliverable_id,
+        filename=deliverable.filename,
+        student_name=deliverable.student_name,
+        uploaded_at=deliverable.uploaded_at.isoformat(),
+        message="Uploaded successfully",
+    )
+
+
 @app.post(
     "/assignments/{assignment_id}/deliverables/bulk",
     response_model=BulkDeliverableUploadResponse,
@@ -308,20 +349,11 @@ async def upload_multiple_deliverables(
     deliverable_service = DeliverableService()
 
     try:
-        uploaded_deliverables: list[DeliverableUploadResponse] = []
-        files_data: list[tuple[str, bytes, str, str]] = []
-
+        files_data: list[Any] = []
         for file in files:
-            if file.filename:
-                is_valid, error_msg = deliverable_service.validate_file_format(  # type: ignore
-                    file.filename, file.content_type or DEFAULT_CONTENT_TYPE
-                )
-                if not is_valid:
-                    continue
-
-                content = await file.read()
-                extension = file.filename.split(".")[-1] if "." in file.filename else ""
-                files_data.append((file.filename, content, extension, file.content_type or DEFAULT_CONTENT_TYPE))
+            file_data = await prepare_file_data(file, deliverable_service)
+            if file_data:
+                files_data.append(file_data)
 
         if not files_data:
             raise HTTPException(status_code=422, detail="No valid files provided")
@@ -330,18 +362,11 @@ async def upload_multiple_deliverables(
             assignment_id=assignment_id, files=files_data, extract_names=extract_names
         )
 
+        uploaded_deliverables: list[DeliverableUploadResponse] = []
         for deliverable_id in deliverable_ids:
-            deliverable = deliverable_service.get_deliverable(deliverable_id)
-            if deliverable:
-                uploaded_deliverables.append(
-                    DeliverableUploadResponse(
-                        id=deliverable_id,
-                        filename=deliverable.filename,
-                        student_name=deliverable.student_name,
-                        uploaded_at=deliverable.uploaded_at.isoformat(),
-                        message="Uploaded successfully",
-                    )
-                )
+            response = create_deliverable_response(deliverable_id, deliverable_service)
+            if response:
+                uploaded_deliverables.append(response)
 
         return BulkDeliverableUploadResponse(
             deliverables=uploaded_deliverables,
