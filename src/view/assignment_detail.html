@@ -118,7 +118,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="uploadModalTitle">Upload File</h2>
-                <span class="close" onclick="hideUploadModal()">&times;</span>
+                <button type="button" class="close" aria-label="Close" onclick="hideUploadModal()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <form id="uploadForm" enctype="multipart/form-data">
                 <div class="form-group">
@@ -142,7 +144,9 @@
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h2>Upload Student Deliverables</h2>
-                <span class="close" onclick="hideDeliverableUploadModal()">&times;</span>
+                <button type="button" class="close" aria-label="Close" onclick="hideDeliverableUploadModal()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <div class="upload-area" id="uploadArea">
@@ -182,7 +186,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edit Deliverable</h2>
-                <span class="close" onclick="hideEditDeliverableModal()">&times;</span>
+                <button type="button" class="close" aria-label="Close" onclick="hideEditDeliverableModal()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <form id="editDeliverableForm">
                 <input type="hidden" id="editDeliverableId">
