@@ -51,7 +51,7 @@ class TestDeliverableService:
             mock_reader_instance.pages = [mock_page]
             mock_pdf_reader.return_value = mock_reader_instance
 
-            name, text = service.extract_student_name_from_pdf(b"pdf content")  # type: ignore
+            name, _ = service.extract_student_name_from_pdf(b"pdf content")  # type: ignore
             assert name == expected_name
 
     @patch("src.service.deliverable_service.get_database_repository")
@@ -96,7 +96,7 @@ class TestDeliverableService:
         mock_pdf_reader.return_value = mock_reader_instance
 
         service = DeliverableService()
-        name, text = service.extract_student_name_from_pdf(b"pdf content")  # type: ignore
+        name, _ = service.extract_student_name_from_pdf(b"pdf content")  # type: ignore
 
         assert name == "Jane Smith"
         mock_logger.warning.assert_called()
@@ -510,7 +510,7 @@ class TestDeliverableService:
         service.openai_api_key = "test_api_key"
 
         with patch.object(service, "extract_name_with_openai", return_value="John Doe") as mock_openai:
-            name, text = service.extract_student_name_from_pdf(b"pdf content")  # type: ignore
+            name, _ = service.extract_student_name_from_pdf(b"pdf content")  # type: ignore
 
             mock_openai.assert_called_once()
             assert name == "John Doe"
