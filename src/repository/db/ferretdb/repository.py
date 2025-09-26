@@ -129,37 +129,34 @@ class FerretDBRepository(DatabaseRepository):
             return False
 
     def store_file(self, assignment_id: str, filename: str, content: bytes, content_type: str, file_type: str) -> str:
-        try:
-            obj_id = ObjectId(assignment_id)
+        obj_id = ObjectId(assignment_id)
 
-            gridfs_id = self.fs.put(
-                content, filename=filename, content_type=content_type, assignment_id=str(obj_id), file_type=file_type
+        gridfs_id = self.fs.put(
+            content, filename=filename, content_type=content_type, assignment_id=str(obj_id), file_type=file_type
+        )
+
+        file_data: dict[str, Any] = {
+            "assignment_id": obj_id,
+            "filename": filename,
+            "gridfs_id": gridfs_id,
+            "content_type": content_type,
+            "file_type": file_type,
+            "file_size": len(content),
+            "uploaded_at": datetime.now(UTC),
+        }
+        result = self.files_collection.insert_one(file_data)
+        file_id = str(result.inserted_id)
+
+        if file_type == "rubric":
+            self.assignments_collection.update_one(
+                {"_id": obj_id}, {MONGO_PUSH: {"evaluation_rubrics": result.inserted_id}}
+            )
+        elif file_type == "relevant_document":
+            self.assignments_collection.update_one(
+                {"_id": obj_id}, {MONGO_PUSH: {"relevant_documents": result.inserted_id}}
             )
 
-            file_data: dict[str, Any] = {
-                "assignment_id": obj_id,
-                "filename": filename,
-                "gridfs_id": gridfs_id,
-                "content_type": content_type,
-                "file_type": file_type,
-                "file_size": len(content),
-                "uploaded_at": datetime.now(UTC),
-            }
-            result = self.files_collection.insert_one(file_data)
-            file_id = str(result.inserted_id)
-
-            if file_type == "rubric":
-                self.assignments_collection.update_one(
-                    {"_id": obj_id}, {MONGO_PUSH: {"evaluation_rubrics": result.inserted_id}}
-                )
-            elif file_type == "relevant_document":
-                self.assignments_collection.update_one(
-                    {"_id": obj_id}, {MONGO_PUSH: {"relevant_documents": result.inserted_id}}
-                )
-
-            return file_id
-        except Exception:
-            raise
+        return file_id
 
     def get_file(self, file_id: str) -> FileModel | None:
         try:
@@ -205,42 +202,39 @@ class FerretDBRepository(DatabaseRepository):
         student_name: str = "Unknown",
         extracted_text: str | None = None,
     ) -> str:
-        try:
-            obj_id = ObjectId(assignment_id)
+        obj_id = ObjectId(assignment_id)
 
-            gridfs_id = self.fs.put(
-                content,
-                filename=filename,
-                content_type=content_type,
-                assignment_id=str(obj_id),
-                student_name=student_name,
-            )
+        gridfs_id = self.fs.put(
+            content,
+            filename=filename,
+            content_type=content_type,
+            assignment_id=str(obj_id),
+            student_name=student_name,
+        )
 
-            deliverable_data: dict[str, Any] = {
-                "assignment_id": obj_id,
-                "student_name": student_name,
-                "mark": None,
-                "certainty_threshold": None,
-                "filename": filename,
-                "gridfs_id": gridfs_id,
-                "extension": extension,
-                "content_type": content_type,
-                "file_size": len(content),
-                "uploaded_at": datetime.now(UTC),
-                "updated_at": datetime.now(UTC),
-                "extracted_text": extracted_text,
-            }
-            result = self.deliverables_collection.insert_one(deliverable_data)
-            deliverable_id = result.inserted_id
+        deliverable_data: dict[str, Any] = {
+            "assignment_id": obj_id,
+            "student_name": student_name,
+            "mark": None,
+            "certainty_threshold": None,
+            "filename": filename,
+            "gridfs_id": gridfs_id,
+            "extension": extension,
+            "content_type": content_type,
+            "file_size": len(content),
+            "uploaded_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
+            "extracted_text": extracted_text,
+        }
+        result = self.deliverables_collection.insert_one(deliverable_data)
+        deliverable_id = result.inserted_id
 
-            self.assignments_collection.update_one(
-                {"_id": obj_id},
-                {MONGO_PUSH: {"deliverables": deliverable_id}, "$set": {"updated_at": datetime.now(UTC)}},
-            )
+        self.assignments_collection.update_one(
+            {"_id": obj_id},
+            {MONGO_PUSH: {"deliverables": deliverable_id}, "$set": {"updated_at": datetime.now(UTC)}},
+        )
 
-            return str(deliverable_id)
-        except Exception:
-            raise
+        return str(deliverable_id)
 
     def get_deliverable(self, deliverable_id: str) -> DeliverableModel | None:
         try:
