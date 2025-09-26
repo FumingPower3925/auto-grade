@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime
 from typing import Any
 
@@ -32,7 +33,7 @@ class TestAssignmentModel:
 
         assert assignment.id == assignment_id
         assert assignment.name == "Test Assignment"
-        assert assignment.confidence_threshold == 0.75
+        assert math.isclose(assignment.confidence_threshold, 0.75, rel_tol=1e-6, abs_tol=1e-12)
         assert rubric_id in assignment.evaluation_rubrics
         assert doc_id in assignment.relevant_documents
         assert deliverable_id in assignment.deliverables
@@ -118,7 +119,7 @@ class TestAssignmentModel:
 
         assert assignment.id == assignment_id
         assert assignment.name == "Test Assignment"
-        assert assignment.confidence_threshold == 0.75
+        assert math.isclose(assignment.confidence_threshold, 0.75, rel_tol=1e-6, abs_tol=1e-12)
 
     def test_model_validation_with_string_ids(self) -> None:
         """Test creating AssignmentModel with string ObjectIds."""

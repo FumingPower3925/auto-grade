@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from src.repository.db.base import DatabaseRepository
@@ -29,7 +31,7 @@ class TestRepositoryOperations:
         assignment = repo.get_assignment(assignment_id)
         assert assignment is not None
         assert assignment.name == "CRUD Test Assignment"
-        assert assignment.confidence_threshold == 0.85
+        assert math.isclose(assignment.confidence_threshold, 0.85, rel_tol=1e-6, abs_tol=1e-12)
 
         success = repo.update_assignment(assignment_id, name="Updated Assignment", confidence_threshold=0.95)
         assert success is True
@@ -37,7 +39,7 @@ class TestRepositoryOperations:
         updated = repo.get_assignment(assignment_id)
         assert updated is not None
         assert updated.name == "Updated Assignment"
-        assert updated.confidence_threshold == 0.95
+        assert math.isclose(updated.confidence_threshold, 0.95, rel_tol=1e-6, abs_tol=1e-12)
 
         success = repo.delete_assignment(assignment_id)
         assert success is True
@@ -141,7 +143,8 @@ class TestRepositoryOperations:
             updated = repo.get_deliverable(deliverable_id)
             if updated:
                 assert updated.student_name == "Updated Student"
-                assert updated.mark == 8.5
+                assert updated.mark is not None
+                assert math.isclose(updated.mark, 8.5, rel_tol=1e-6, abs_tol=1e-12)
 
         success = repo.delete_deliverable(deliverable_id)
 

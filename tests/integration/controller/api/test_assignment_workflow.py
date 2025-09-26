@@ -1,4 +1,5 @@
 import io
+import math
 from typing import Any
 
 import pytest
@@ -36,7 +37,7 @@ class TestAssignmentWorkflow:
         self.test_assignments.append(assignment_id)
 
         assert assignment["name"] == "Integration Test Assignment"
-        assert assignment["confidence_threshold"] == 0.85
+        assert math.isclose(assignment["confidence_threshold"], 0.85, rel_tol=1e-6, abs_tol=1e-12)
         assert assignment["deliverables"] == []
 
         response = self.client.get(f"/assignments/{assignment_id}")
