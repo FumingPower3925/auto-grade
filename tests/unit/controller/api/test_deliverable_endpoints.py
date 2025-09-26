@@ -1,4 +1,5 @@
 import io
+import math
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
@@ -200,7 +201,7 @@ class TestDeliverableEndpoints:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["student_name"] == "Updated Name"
-        assert data["mark"] == 9.0
+        assert math.isclose(data["mark"], 9.0, rel_tol=1e-6, abs_tol=1e-12)
 
     @patch("src.controller.api.api.DeliverableService")
     def test_update_deliverable_not_found(self, mock_service_class: MagicMock) -> None:

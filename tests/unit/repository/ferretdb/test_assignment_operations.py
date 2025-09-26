@@ -1,3 +1,4 @@
+import math
 import warnings
 from datetime import UTC, datetime
 from typing import Literal, TypedDict
@@ -55,7 +56,7 @@ class TestAssignmentOperations:
 
         call_args = mock_collection.insert_one.call_args[0][0]
         assert call_args["name"] == "Test Assignment"
-        assert call_args["confidence_threshold"] == 0.75
+        assert math.isclose(call_args["confidence_threshold"], 0.75, rel_tol=1e-6, abs_tol=1e-12)
         assert call_args["deliverables"] == []
         assert call_args["evaluation_rubrics"] == []
         assert call_args["relevant_documents"] == []
@@ -79,7 +80,7 @@ class TestAssignmentOperations:
 
         assert isinstance(result, AssignmentModel)
         assert result.name == "Test Assignment"
-        assert result.confidence_threshold == 0.75
+        assert math.isclose(result.confidence_threshold, 0.75, rel_tol=1e-6, abs_tol=1e-12)
         mock_collection.find_one.assert_called_once_with({"_id": assignment_id})
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
@@ -167,7 +168,7 @@ class TestAssignmentOperations:
         assert call_args[0][0] == {"_id": assignment_id}
         update_doc = call_args[0][1]["$set"]
         assert update_doc["name"] == "Updated Assignment"
-        assert update_doc["confidence_threshold"] == 0.90
+        assert math.isclose(update_doc["confidence_threshold"], 0.90, rel_tol=1e-6, abs_tol=1e-12)
         assert isinstance(update_doc["updated_at"], datetime)
 
     @patch("src.repository.db.ferretdb.repository.GridFS")

@@ -24,15 +24,15 @@
                     <h3>Assignment Information</h3>
                     <div class="info-grid">
                         <div class="info-item">
-                            <label>Confidence Threshold:</label>
+                            <span class="label">Confidence Threshold:</span>
                             <span>{{ "%.2f"|format(assignment.confidence_threshold) }}</span>
                         </div>
                         <div class="info-item">
-                            <label>Created:</label>
+                            <span class="label">Created:</span>
                             <span>{{ assignment.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
                         </div>
                         <div class="info-item">
-                            <label>Last Updated:</label>
+                            <span class="label">Last Updated:</span>
                             <span>{{ assignment.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
                         </div>
                     </div>
@@ -118,7 +118,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="uploadModalTitle">Upload File</h2>
-                <span class="close" onclick="hideUploadModal()">&times;</span>
+                <button type="button" class="close" aria-label="Close" onclick="hideUploadModal()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <form id="uploadForm" enctype="multipart/form-data">
                 <div class="form-group">
@@ -142,7 +144,9 @@
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h2>Upload Student Deliverables</h2>
-                <span class="close" onclick="hideDeliverableUploadModal()">&times;</span>
+                <button type="button" class="close" aria-label="Close" onclick="hideDeliverableUploadModal()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <div class="modal-body">
                 <div class="upload-area" id="uploadArea">
@@ -182,7 +186,9 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edit Deliverable</h2>
-                <span class="close" onclick="hideEditDeliverableModal()">&times;</span>
+                <button type="button" class="close" aria-label="Close" onclick="hideEditDeliverableModal()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <form id="editDeliverableForm">
                 <input type="hidden" id="editDeliverableId">

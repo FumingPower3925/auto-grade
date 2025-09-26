@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime
 from typing import Any, NotRequired, TypedDict
 from unittest.mock import MagicMock, patch
@@ -123,8 +124,10 @@ class TestDeliverableOperations:
 
         assert isinstance(result, DeliverableModel)
         assert result.student_name == "Jane Smith"
-        assert result.mark == 8.55
-        assert result.certainty_threshold == 0.95
+        assert result.mark is not None and math.isclose(result.mark, 8.55, rel_tol=1e-6, abs_tol=1e-12)
+        assert result.certainty_threshold is not None and math.isclose(
+            result.certainty_threshold, 0.95, rel_tol=1e-6, abs_tol=1e-12
+        )
         assert result.filename == "assignment.pdf"
         assert result.content == b"pdf content"
         mock_collection.find_one.assert_called_once_with({"_id": deliverable_id})
@@ -213,7 +216,7 @@ class TestDeliverableOperations:
         assert all(isinstance(d, DeliverableModel) for d in result)
         assert result[0].student_name == "Student 1"
         assert result[1].student_name == "Student 2"
-        assert result[1].mark == 9.0
+        assert result[1].mark is not None and math.isclose(result[1].mark, 9.0, rel_tol=1e-6, abs_tol=1e-12)
 
         mock_collection.find.assert_called_once_with({"assignment_id": assignment_id})
 
@@ -279,8 +282,8 @@ class TestDeliverableOperations:
         assert call_args[0][0] == {"_id": deliverable_id}
         update_doc = call_args[0][1]["$set"]
         assert update_doc["student_name"] == "Updated Name"
-        assert update_doc["mark"] == 7.55
-        assert update_doc["certainty_threshold"] == 0.80
+        assert math.isclose(update_doc["mark"], 7.55, rel_tol=1e-6, abs_tol=1e-12)
+        assert math.isclose(update_doc["certainty_threshold"], 0.80, rel_tol=1e-6, abs_tol=1e-12)
         assert isinstance(update_doc["updated_at"], datetime)
 
     @patch("src.repository.db.ferretdb.repository.GridFS")

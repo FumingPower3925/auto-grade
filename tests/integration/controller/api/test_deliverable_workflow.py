@@ -1,4 +1,5 @@
 import io
+import math
 
 import pytest
 from fastapi import status
@@ -57,9 +58,9 @@ class TestDeliverableWorkflow:
 
         updated = response.json()
         assert updated["student_name"] == "John Doe"
-        assert updated["mark"] == 8.5
+        assert math.isclose(updated["mark"], 8.5, rel_tol=1e-6, abs_tol=1e-12)
         assert updated["mark_status"] == "Marked"
-        assert updated["certainty_threshold"] == 0.9
+        assert math.isclose(updated["certainty_threshold"], 0.9, rel_tol=1e-6, abs_tol=1e-12)
 
         response = self.client.get(f"/deliverables/{deliverable_id}/download")
         assert response.status_code == status.HTTP_200_OK
@@ -172,7 +173,7 @@ class TestDeliverableWorkflow:
         assert response.status_code == status.HTTP_200_OK
         updated = response.json()
         assert updated["student_name"] == "Jane Smith"
-        assert updated["mark"] == 9.0
+        assert math.isclose(updated["mark"], 9.0, rel_tol=1e-6, abs_tol=1e-12)
 
     def test_assignment_deletion_cascades_to_deliverables(self) -> None:
         response = self.client.post(

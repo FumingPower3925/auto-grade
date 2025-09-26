@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime
 from typing import Any
 
@@ -35,8 +36,10 @@ class TestDeliverableModel:
         assert deliverable.id == deliverable_id
         assert deliverable.assignment_id == assignment_id
         assert deliverable.student_name == "John Doe"
-        assert deliverable.mark == 8.55
-        assert deliverable.certainty_threshold == 0.95
+        assert deliverable.mark is not None and math.isclose(deliverable.mark, 8.55, rel_tol=1e-6, abs_tol=1e-12)
+        assert deliverable.certainty_threshold is not None and math.isclose(
+            deliverable.certainty_threshold, 0.95, rel_tol=1e-6, abs_tol=1e-12
+        )
         assert deliverable.filename == "submission.pdf"
         assert deliverable.content == b"PDF content"
         assert deliverable.extracted_text == "Extracted text"
@@ -164,8 +167,10 @@ class TestDeliverableModel:
         assert deliverable.id == deliverable_id
         assert deliverable.assignment_id == assignment_id
         assert deliverable.student_name == "Jane Smith"
-        assert deliverable.mark == 9.0
-        assert deliverable.certainty_threshold == 0.85
+        assert deliverable.mark is not None and math.isclose(deliverable.mark, 9.0, rel_tol=1e-6, abs_tol=1e-12)
+        assert deliverable.certainty_threshold is not None and math.isclose(
+            deliverable.certainty_threshold, 0.85, rel_tol=1e-6, abs_tol=1e-12
+        )
 
     def test_model_validation_with_string_ids(self) -> None:
         """Test creating DeliverableModel with string ObjectIds."""
@@ -235,8 +240,10 @@ class TestDeliverableModel:
         updated = original.model_copy(update={"student_name": "Updated Name", "mark": 8.5, "certainty_threshold": 0.90})
 
         assert updated.student_name == "Updated Name"
-        assert updated.mark == 8.5
-        assert updated.certainty_threshold == 0.90
+        assert updated.mark is not None and math.isclose(updated.mark, 8.5, rel_tol=1e-6, abs_tol=1e-12)
+        assert updated.certainty_threshold is not None and math.isclose(
+            updated.certainty_threshold, 0.90, rel_tol=1e-6, abs_tol=1e-12
+        )
         assert updated.filename == original.filename
         assert updated.assignment_id == original.assignment_id
 

@@ -104,3 +104,24 @@ markers = [
     "e2e: End-to-end tests",
     "slow: Slow tests",
 ]
+
+[tool.sonar]
+projectKey = "FumingPower3925_auto-grade"
+organization = "fumingpower3925"
+projectName = "auto-grade"
+projectVersion = "0.1.0"
+
+sources = "src,config"
+tests = "tests"
+python.coverage.reportPaths = "coverage/coverage.xml"
+python.xunit.reportPath = "test-results/*.xml"
+
+exclusions = "**/__pycache__/**,**/venv/**,**/.venv/**,**/tests/**,**/static/**"
+coverage.exclusions = "**/tests/**,**/__init__.py,main.py,**/static/**,**/src/view/**"
+
+python.version = "3.13"
+
+scm.provider = "git"
+sourceEncoding = "UTF-8"
+
+qualitygate.wait = true
