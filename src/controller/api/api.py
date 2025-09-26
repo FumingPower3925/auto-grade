@@ -26,6 +26,8 @@ from src.service.health_service import HealthService
 
 DEFAULT_CONTENT_TYPE = "application/octet-stream"
 
+DELIVERABLE_NOT_FOUND = "Deliverable not found"
+
 app = FastAPI(
     title="Auto Grade API",
     description="A PoC of an automatic bulk assignment grader LLM engine",
@@ -426,7 +428,7 @@ async def update_deliverable(deliverable_id: str, request: UpdateDeliverableRequ
         )
 
         if not success:
-            raise HTTPException(status_code=404, detail="Deliverable not found")
+            raise HTTPException(status_code=404, detail=DELIVERABLE_NOT_FOUND)
 
         deliverable = deliverable_service.get_deliverable(deliverable_id)
         if not deliverable:
@@ -463,7 +465,7 @@ async def delete_deliverable(deliverable_id: str) -> DeleteResponse:
         success = deliverable_service.delete_deliverable(deliverable_id)
 
         if not success:
-            raise HTTPException(status_code=404, detail="Deliverable not found")
+            raise HTTPException(status_code=404, detail=DELIVERABLE_NOT_FOUND)
 
         return DeleteResponse(message="Deliverable deleted successfully")
     except HTTPException:
@@ -480,7 +482,7 @@ async def download_deliverable(deliverable_id: str) -> StreamingResponse:
     try:
         deliverable = deliverable_service.get_deliverable(deliverable_id)
         if not deliverable:
-            raise HTTPException(status_code=404, detail="Deliverable not found")
+            raise HTTPException(status_code=404, detail=DELIVERABLE_NOT_FOUND)
 
         return StreamingResponse(
             io.BytesIO(deliverable.content),
