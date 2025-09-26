@@ -2,7 +2,7 @@ import os
 import re
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e.test_helpers import cleanup_assignments_by_name
 
@@ -124,59 +124,69 @@ class TestWebNavigationE2E:
         expect(healthcheck_button).to_have_css("color", "rgb(21, 87, 36)", timeout=5000)
         expect(healthcheck_button).to_have_css("border-color", "rgb(40, 167, 69)")
 
+    def _find_modal_confirm_button(self, page: Page, modal: Locator) -> Locator | None:
+        """Helper method to find the confirm button in a modal."""
+        selectors = [
+            "#deleteConfirmModal button:has-text('Confirm')",
+            "#deleteConfirmModal button.btn-danger",
+            "#deleteConfirmModal button.confirm",
+        ]
+
+        for selector in selectors:
+            btn = page.locator(selector)
+            if btn.count() > 0:
+                return btn.first
+
+        # Fallback: search any button containing 'confirm'
+        buttons = modal.locator("button")
+        for i in range(buttons.count()):
+            candidate = buttons.nth(i)
+            try:
+                if "confirm" in candidate.inner_text().lower():
+                    return candidate
+            except Exception:
+                pass
+
+        return None
+
+    def _delete_assignment_with_modal(self, page: Page, card: Locator) -> bool:
+        """Helper method to delete an assignment via modal confirmation.
+        Returns True if deletion was successful, False otherwise."""
+        delete_button = card.locator("button:has-text('Delete')")
+        delete_button.click()
+
+        modal = page.locator("#deleteConfirmModal")
+        page.wait_for_timeout(50)
+        expect(modal).to_be_visible()
+
+        confirm_button = self._find_modal_confirm_button(page, modal)
+
+        if confirm_button is None:
+            # Close modal gracefully if no confirm button found
+            close_btn = modal.locator("button:has-text('Cancel')")
+            if close_btn.count() > 0:
+                close_btn.click()
+            return False
+
+        # Click confirm and wait for modal to disappear
+        expect(confirm_button).to_be_visible()
+        page.wait_for_timeout(50)
+        confirm_button.click()
+        expect(modal).not_to_be_visible()
+        page.wait_for_timeout(150)
+        return True
+
     def test_empty_state_messaging(self, page: Page) -> None:
         """Test that appropriate messages are shown for empty states."""
-        # Delete all assignments if any exist
+        # Delete all existing assignments
         assignment_cards = page.locator(".assignment-card")
         cards_count = assignment_cards.count()
 
         for _ in range(cards_count):
             card = page.locator(".assignment-card").first
-            delete_button = card.locator("button:has-text('Delete')")
-            delete_button.click()
-            modal = page.locator("#deleteConfirmModal")
-            # Wait for modal to appear (retry small intervals)
-            page.wait_for_timeout(50)
-            expect(modal).to_be_visible()
-            # Try multiple possible confirm button labels/selectors
-            confirm_button = None
-            possible_selectors = [
-                "#deleteConfirmModal button:has-text('Confirm')",
-                "#deleteConfirmModal button.btn-danger",
-                "#deleteConfirmModal button.confirm",
-            ]
-            for sel in possible_selectors:
-                btn = page.locator(sel)
-                if btn.count() > 0:
-                    confirm_button = btn.first
-                    break
-            # Fallback: search any button inside modal containing 'Confirm'
-            if confirm_button is None:
-                btns = modal.locator("button")
-                for i in range(btns.count()):
-                    candidate = btns.nth(i)
-                    try:
-                        if "confirm" in candidate.inner_text().lower():
-                            confirm_button = candidate
-                            break
-                    except Exception:
-                        pass
-            # Ensure we found a button; if not, skip this deletion to avoid flake
-            if confirm_button is None:
-                # Close modal gracefully to proceed
-                close_btn = modal.locator("button:has-text('Cancel')")
-                if close_btn.count() > 0:
-                    close_btn.click()
-                continue
-            # Wait for button to be enabled/visible then click
-            expect(confirm_button).to_be_visible()
-            # Sometimes animation delays clickability
-            page.wait_for_timeout(50)
-            confirm_button.click()
-            # Wait for the modal to disappear to ensure deletion request processed
-            expect(modal).not_to_be_visible()
-            page.wait_for_timeout(150)
+            self._delete_assignment_with_modal(page, card)
 
+        # Verify empty state message
         page.wait_for_timeout(500)
         no_assignments = page.locator(".no-assignments")
         if no_assignments.count() > 0:
