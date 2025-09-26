@@ -53,20 +53,20 @@ FROM base AS test
 
 # Install additional system dependencies for Playwright
 RUN apt-get update && apt-get --no-install-recommends install -y \
-    libnss3 \
-    libnspr4 \
-    libxss1 \
     libasound2 \
-    libxrandr2 \
     libatk1.0-0 \
-    libgtk-3-0 \
+    libgbm1 \
     libgdk-pixbuf-xlib-2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
     libxcomposite1 \
     libxcursor1 \
     libxdamage1 \
     libxi6 \
+    libxrandr2 \
+    libxss1 \
     libxtst6 \
-    libgbm1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -80,11 +80,8 @@ COPY tests/ ./tests/
 COPY main.py ./
 COPY .coveragerc ./
 
-# Install Playwright browsers before switching to appuser
-RUN playwright install chromium
-
-# Create playwright cache directory and set permissions
-RUN mkdir -p /home/appuser/.cache && \
+RUN playwright install chromium && \
+    mkdir -p /home/appuser/.cache && \
     cp -r /root/.cache/ms-playwright /home/appuser/.cache/ && \
     chown -R appuser:appuser /app /home/appuser/.cache
 
