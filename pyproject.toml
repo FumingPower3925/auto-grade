@@ -35,9 +35,9 @@ mypy = "^1.18.1"
 playwright = "^1.55.0"
 pytest-playwright = "^0.7.1"
 pytest-asyncio = "^1.2.0"
-ruff = "^0.13.2"
+ruff = "^0.14.4"
 bandit = {extras = ["toml"], version = "^1.7.5"}
-safety = "^3.6.2"
+safety = "^3.7.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
