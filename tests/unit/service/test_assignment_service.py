@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from bson import ObjectId
 
-from src.repository.db.models import AssignmentModel, FileModel
+from src.repository.db.models import AssignmentModel, ExtractedRubricModel, FileModel
 from src.service.assignment_service import AssignmentService
 
 
@@ -98,8 +98,9 @@ class TestAssignmentService:
         assert result is True
         mock_repo.delete_assignment.assert_called_once_with("test_id")
 
+    @patch("src.service.assignment_service.RubricService")
     @patch("src.service.assignment_service.get_database_repository")
-    def test_upload_rubric_success(self, mock_get_repo: MagicMock) -> None:
+    def test_upload_rubric_success(self, mock_get_repo: MagicMock, mock_rubric_service: MagicMock) -> None:
         """Test successful rubric upload."""
         mock_repo = MagicMock()
         mock_assignment = self._create_mock_assignment()
@@ -107,12 +108,18 @@ class TestAssignmentService:
         mock_repo.store_file.return_value = "file_id_123"
         mock_get_repo.return_value = mock_repo
 
+        mock_extracted_rubric = ExtractedRubricModel(title="Test Rubric", total_points=100, criteria=[])
+        mock_rubric_service_instance = MagicMock()
+        mock_rubric_service_instance.parse_rubric.return_value = mock_extracted_rubric
+        mock_rubric_service.return_value = mock_rubric_service_instance
+
         service = AssignmentService()
         file_id = service.upload_rubric("assignment_id", "rubric.pdf", b"content", "application/pdf")
 
         assert file_id == "file_id_123"
+        mock_rubric_service_instance.parse_rubric.assert_called_once_with(b"content", "application/pdf")
         mock_repo.store_file.assert_called_once_with(
-            "assignment_id", "rubric.pdf", b"content", "application/pdf", "rubric"
+            "assignment_id", "rubric.pdf", b"content", "application/pdf", "rubric", mock_extracted_rubric
         )
 
     @patch("src.service.assignment_service.get_database_repository")

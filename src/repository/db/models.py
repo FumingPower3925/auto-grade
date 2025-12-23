@@ -85,6 +85,37 @@ class AssignmentModel(BaseModel):
     )
 
 
+class RubricCriterionModel(BaseModel):
+    """Model representing a single grading criterion from a rubric."""
+
+    name: str = Field(..., max_length=255)
+    description: str = Field(default="")
+    max_points: float = Field(..., ge=0.0)
+    weight: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @field_validator("weight")
+    @classmethod
+    def validate_weight(cls, v: float | None) -> float | None:
+        return round(v, 2) if v is not None else None
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+
+class ExtractedRubricModel(BaseModel):
+    """Model representing structured information extracted from a rubric."""
+
+    title: str | None = Field(default=None, max_length=255)
+    total_points: float | None = Field(default=None, ge=0.0)
+    criteria: list[RubricCriterionModel] = Field(default_factory=list)
+    raw_text: str | None = Field(default=None)
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+
 class FileModel(BaseModel):
     id: PyObjectId | ObjectId = Field(default_factory=PyObjectId, alias="_id")
     assignment_id: PyObjectId | ObjectId
@@ -93,6 +124,7 @@ class FileModel(BaseModel):
     content_type: str
     file_type: str
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    extracted_rubric: ExtractedRubricModel | None = Field(default=None)
 
     @field_serializer("id", "assignment_id")
     def serialize_objectid(self, value: PyObjectId | ObjectId) -> str:

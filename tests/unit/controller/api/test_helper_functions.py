@@ -92,3 +92,62 @@ class TestHelperFunctions:
         result = create_deliverable_response("deliverable_id", mock_service)
 
         assert result is None
+
+
+class TestConvertExtractedRubric:
+    """Tests for convert_extracted_rubric helper function."""
+
+    def test_convert_extracted_rubric_none(self) -> None:
+        """Test convert_extracted_rubric with None input."""
+        from src.controller.api.api import convert_extracted_rubric
+
+        result = convert_extracted_rubric(None)
+        assert result is None
+
+    def test_convert_extracted_rubric_with_data(self) -> None:
+        """Test convert_extracted_rubric with valid data."""
+        from src.controller.api.api import convert_extracted_rubric
+        from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
+
+        extracted = ExtractedRubricModel(
+            title="Test Rubric",
+            total_points=100.0,
+            criteria=[
+                RubricCriterionModel(name="Quality", description="Code quality", max_points=50.0, weight=0.5),
+                RubricCriterionModel(name="Style", description="Code style", max_points=50.0, weight=None),
+            ],
+            raw_text="Raw rubric text",
+        )
+
+        result = convert_extracted_rubric(extracted)
+
+        assert result is not None
+        assert result.title == "Test Rubric"
+        assert result.total_points == pytest.approx(100.0)
+        assert len(result.criteria) == 2
+        assert result.criteria[0].name == "Quality"
+        assert result.criteria[0].weight == pytest.approx(0.5)
+        assert result.criteria[1].name == "Style"
+        assert result.criteria[1].weight is None
+        assert result.raw_text == "Raw rubric text"
+
+    def test_convert_extracted_rubric_empty_criteria(self) -> None:
+        """Test convert_extracted_rubric with no criteria."""
+        from src.controller.api.api import convert_extracted_rubric
+        from src.repository.db.models import ExtractedRubricModel
+
+        extracted = ExtractedRubricModel(
+            title=None,
+            total_points=None,
+            criteria=[],
+            raw_text=None,
+        )
+
+        result = convert_extracted_rubric(extracted)
+
+        assert result is not None
+        assert result.title is None
+        assert result.total_points is None
+        assert result.criteria == []
+        assert result.raw_text is None
+

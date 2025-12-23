@@ -15,11 +15,14 @@ from src.controller.api.models import (
     DeliverableListResponse,
     DeliverableResponse,
     DeliverableUploadResponse,
+    ExtractedRubricResponse,
     FileInfo,
     FileUploadResponse,
     HealthResponse,
+    RubricCriterionResponse,
     UpdateDeliverableRequest,
 )
+from src.repository.db.models import ExtractedRubricModel
 from src.service.assignment_service import AssignmentService
 from src.service.deliverable_service import DeliverableService
 from src.service.health_service import HealthService
@@ -34,6 +37,29 @@ app = FastAPI(
     version="0.1.0",
     root_path="/api",
 )
+
+
+def convert_extracted_rubric(extracted_rubric: ExtractedRubricModel | None) -> ExtractedRubricResponse | None:
+    """Convert ExtractedRubricModel to API response format."""
+    if extracted_rubric is None:
+        return None
+
+    criteria = [
+        RubricCriterionResponse(
+            name=c.name,
+            description=c.description,
+            max_points=c.max_points,
+            weight=c.weight,
+        )
+        for c in extracted_rubric.criteria
+    ]
+
+    return ExtractedRubricResponse(
+        title=extracted_rubric.title,
+        total_points=extracted_rubric.total_points,
+        criteria=criteria,
+        raw_text=extracted_rubric.raw_text,
+    )
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
@@ -128,6 +154,7 @@ async def get_assignment(assignment_id: str) -> AssignmentDetailResponse:
                 content_type=rubric.content_type,
                 file_type=rubric.file_type,
                 uploaded_at=rubric.uploaded_at.isoformat(),
+                extracted_rubric=convert_extracted_rubric(rubric.extracted_rubric),
             )
             for rubric in rubrics
         ]

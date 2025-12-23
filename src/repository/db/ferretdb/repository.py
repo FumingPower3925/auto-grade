@@ -11,7 +11,13 @@ from pymongo.errors import ConnectionFailure
 
 from config.config import get_config
 from src.repository.db.base import DatabaseRepository
-from src.repository.db.models import AssignmentModel, DeliverableModel, DocumentModel, FileModel
+from src.repository.db.models import (
+    AssignmentModel,
+    DeliverableModel,
+    DocumentModel,
+    ExtractedRubricModel,
+    FileModel,
+)
 
 MONGO_PUSH = "$push"
 
@@ -58,7 +64,8 @@ class FerretDBRepository(DatabaseRepository):
                 if "gridfs_id" in document:
                     file_data = self.fs.get(document["gridfs_id"])
                     document["document"] = file_data.read()
-                return DocumentModel.model_validate(document)
+                result: DocumentModel = DocumentModel.model_validate(document)
+                return result
             return None
         except Exception:
             return None
@@ -81,7 +88,8 @@ class FerretDBRepository(DatabaseRepository):
             obj_id = ObjectId(assignment_id)
             assignment = self.assignments_collection.find_one({"_id": obj_id})
             if assignment:
-                return AssignmentModel.model_validate(assignment)
+                result: AssignmentModel = AssignmentModel.model_validate(assignment)
+                return result
             return None
         except Exception:
             return None
@@ -113,7 +121,8 @@ class FerretDBRepository(DatabaseRepository):
             self.deliverables_collection.delete_many({"assignment_id": obj_id})
 
             result = self.assignments_collection.delete_one({"_id": obj_id})
-            return result.deleted_count > 0
+            deleted: bool = result.deleted_count > 0
+            return deleted
         except Exception:
             return False
 
@@ -124,11 +133,20 @@ class FerretDBRepository(DatabaseRepository):
             kwargs["updated_at"] = datetime.now(UTC)
 
             result = self.assignments_collection.update_one({"_id": obj_id}, {"$set": kwargs})
-            return result.modified_count > 0
+            modified: bool = result.modified_count > 0
+            return modified
         except Exception:
             return False
 
-    def store_file(self, assignment_id: str, filename: str, content: bytes, content_type: str, file_type: str) -> str:
+    def store_file(
+        self,
+        assignment_id: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        file_type: str,
+        extracted_rubric: ExtractedRubricModel | None = None,
+    ) -> str:
         obj_id = ObjectId(assignment_id)
 
         gridfs_id = self.fs.put(
@@ -144,6 +162,10 @@ class FerretDBRepository(DatabaseRepository):
             "file_size": len(content),
             "uploaded_at": datetime.now(UTC),
         }
+
+        if extracted_rubric is not None:
+            file_data["extracted_rubric"] = extracted_rubric.model_dump()
+
         result = self.files_collection.insert_one(file_data)
         file_id = str(result.inserted_id)
 
@@ -166,7 +188,8 @@ class FerretDBRepository(DatabaseRepository):
                 if "gridfs_id" in file_doc:
                     file_data = self.fs.get(file_doc["gridfs_id"])
                     file_doc["content"] = file_data.read()
-                return FileModel.model_validate(file_doc)
+                result: FileModel = FileModel.model_validate(file_doc)
+                return result
             return None
         except Exception:
             return None
@@ -246,7 +269,8 @@ class FerretDBRepository(DatabaseRepository):
                     deliverable["content"] = file_data.read()
                 else:
                     deliverable["content"] = deliverable.get("content", b"")
-                return DeliverableModel.model_validate(deliverable)
+                result: DeliverableModel = DeliverableModel.model_validate(deliverable)
+                return result
             return None
         except Exception:
             return None
@@ -277,7 +301,8 @@ class FerretDBRepository(DatabaseRepository):
             kwargs["updated_at"] = datetime.now(UTC)
 
             result = self.deliverables_collection.update_one({"_id": obj_id}, {"$set": kwargs})
-            return result.modified_count > 0
+            modified: bool = result.modified_count > 0
+            return modified
         except Exception:
             return False
 
@@ -298,6 +323,7 @@ class FerretDBRepository(DatabaseRepository):
             )
 
             result = self.deliverables_collection.delete_one({"_id": obj_id})
-            return result.deleted_count > 0
+            deleted: bool = result.deleted_count > 0
+            return deleted
         except Exception:
             return False

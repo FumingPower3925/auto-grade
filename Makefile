@@ -43,7 +43,7 @@ lint-check: ## Check linting without fixes
 	ruff check .
 
 type-check: ## Run mypy type checking
-	docker compose --profile test run --rm test mypy src/ config/ --ignore-missing-imports
+	mypy src/ config/ --ignore-missing-imports
 
 security: ## Run security checks with bandit
 	docker compose --profile test run --rm test bandit -r src/

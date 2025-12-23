@@ -169,3 +169,135 @@ class TestFileModel:
 
         dump = file_model.model_dump()
         assert dump["uploaded_at"] == now.isoformat()
+
+    def test_file_model_with_extracted_rubric(self) -> None:
+        """Test FileModel with extracted_rubric field."""
+        from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
+
+        rubric = ExtractedRubricModel(
+            title="Test Rubric",
+            total_points=100,
+            criteria=[RubricCriterionModel(name="Quality", description="Code quality", max_points=50, weight=0.5)],
+            raw_text="Raw text",
+        )
+
+        file_model = FileModel(
+            assignment_id=ObjectId(),
+            filename="rubric.pdf",
+            content=b"content",
+            content_type="application/pdf",
+            file_type="rubric",
+            extracted_rubric=rubric,
+        )
+
+        assert file_model.extracted_rubric is not None
+        assert file_model.extracted_rubric.title == "Test Rubric"
+        assert len(file_model.extracted_rubric.criteria) == 1
+
+    def test_file_model_without_extracted_rubric(self) -> None:
+        """Test FileModel without extracted_rubric field."""
+        file_model = FileModel(
+            assignment_id=ObjectId(),
+            filename="document.pdf",
+            content=b"content",
+            content_type="application/pdf",
+            file_type="relevant_document",
+        )
+
+        assert file_model.extracted_rubric is None
+
+
+class TestRubricCriterionModel:
+    """Tests for RubricCriterionModel."""
+
+    def test_create_rubric_criterion(self) -> None:
+        """Test creating a RubricCriterionModel."""
+        from src.repository.db.models import RubricCriterionModel
+
+        criterion = RubricCriterionModel(
+            name="Code Quality",
+            description="Quality of code structure",
+            max_points=25.0,
+            weight=0.25,
+        )
+
+        assert criterion.name == "Code Quality"
+        assert criterion.description == "Quality of code structure"
+        assert criterion.max_points == pytest.approx(25.0)
+        assert criterion.weight == pytest.approx(0.25)
+
+    def test_rubric_criterion_with_defaults(self) -> None:
+        """Test RubricCriterionModel with default values."""
+        from src.repository.db.models import RubricCriterionModel
+
+        criterion = RubricCriterionModel(name="Test", max_points=10)
+
+        assert criterion.description == ""
+        assert criterion.weight is None
+
+    def test_rubric_criterion_weight_validation(self) -> None:
+        """Test that weight must be between 0.0 and 1.0."""
+        from src.repository.db.models import RubricCriterionModel
+
+        with pytest.raises(ValidationError):
+            RubricCriterionModel(name="Test", max_points=10, weight=1.5)
+
+    def test_rubric_criterion_weight_rounding(self) -> None:
+        """Test that weight is rounded to 2 decimal places."""
+        from src.repository.db.models import RubricCriterionModel
+
+        criterion = RubricCriterionModel(name="Test", max_points=10, weight=0.333)
+
+        assert criterion.weight == pytest.approx(0.33)
+
+
+class TestExtractedRubricModel:
+    """Tests for ExtractedRubricModel."""
+
+    def test_create_extracted_rubric(self) -> None:
+        """Test creating an ExtractedRubricModel."""
+        from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
+
+        criteria = [
+            RubricCriterionModel(name="Criterion 1", max_points=50),
+            RubricCriterionModel(name="Criterion 2", max_points=50),
+        ]
+
+        rubric = ExtractedRubricModel(
+            title="Grading Rubric",
+            total_points=100,
+            criteria=criteria,
+            raw_text="Original text",
+        )
+
+        assert rubric.title == "Grading Rubric"
+        assert rubric.total_points == 100
+        assert len(rubric.criteria) == 2
+        assert rubric.raw_text == "Original text"
+
+    def test_extracted_rubric_with_defaults(self) -> None:
+        """Test ExtractedRubricModel with default values."""
+        from src.repository.db.models import ExtractedRubricModel
+
+        rubric = ExtractedRubricModel()
+
+        assert rubric.title is None
+        assert rubric.total_points is None
+        assert rubric.criteria == []
+        assert rubric.raw_text is None
+
+    def test_extracted_rubric_serialization(self) -> None:
+        """Test ExtractedRubricModel serialization."""
+        from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
+
+        rubric = ExtractedRubricModel(
+            title="Test",
+            total_points=50,
+            criteria=[RubricCriterionModel(name="C1", max_points=25)],
+        )
+
+        dump = rubric.model_dump()
+        assert dump["title"] == "Test"
+        assert dump["total_points"] == 50
+        assert len(dump["criteria"]) == 1
+

@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from src.repository.db.models import AssignmentModel, DeliverableModel, DocumentModel, FileModel
+from src.repository.db.models import (
+    AssignmentModel,
+    DeliverableModel,
+    DocumentModel,
+    ExtractedRubricModel,
+    FileModel,
+)
 
 
 class DatabaseRepository(ABC):
@@ -102,7 +108,15 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def store_file(self, assignment_id: str, filename: str, content: bytes, content_type: str, file_type: str) -> str:
+    def store_file(
+        self,
+        assignment_id: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        file_type: str,
+        extracted_rubric: ExtractedRubricModel | None = None,
+    ) -> str:
         """Store a file related to an assignment.
 
         Args:
@@ -111,6 +125,7 @@ class DatabaseRepository(ABC):
             content: The file content as bytes.
             content_type: The MIME type of the file.
             file_type: The type of file ("rubric" or "relevant_document").
+            extracted_rubric: Optional extracted rubric data for rubric files.
 
         Returns:
             The ID of the stored file.
