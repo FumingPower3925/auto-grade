@@ -40,6 +40,25 @@ class FileInfo(BaseModel):
     content_type: str
     file_type: str
     uploaded_at: str
+    extracted_rubric: "ExtractedRubricResponse | None" = None
+
+
+class RubricCriterionResponse(BaseModel):
+    """API response model for a rubric criterion."""
+
+    name: str
+    description: str
+    max_points: float
+    weight: float | None
+
+
+class ExtractedRubricResponse(BaseModel):
+    """API response model for extracted rubric data."""
+
+    title: str | None
+    total_points: float | None
+    criteria: list[RubricCriterionResponse]
+    raw_text: str | None
 
 
 class AssignmentDetailResponse(BaseModel):

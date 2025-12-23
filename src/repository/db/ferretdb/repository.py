@@ -11,7 +11,13 @@ from pymongo.errors import ConnectionFailure
 
 from config.config import get_config
 from src.repository.db.base import DatabaseRepository
-from src.repository.db.models import AssignmentModel, DeliverableModel, DocumentModel, FileModel
+from src.repository.db.models import (
+    AssignmentModel,
+    DeliverableModel,
+    DocumentModel,
+    ExtractedRubricModel,
+    FileModel,
+)
 
 MONGO_PUSH = "$push"
 
@@ -128,7 +134,15 @@ class FerretDBRepository(DatabaseRepository):
         except Exception:
             return False
 
-    def store_file(self, assignment_id: str, filename: str, content: bytes, content_type: str, file_type: str) -> str:
+    def store_file(
+        self,
+        assignment_id: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        file_type: str,
+        extracted_rubric: ExtractedRubricModel | None = None,
+    ) -> str:
         obj_id = ObjectId(assignment_id)
 
         gridfs_id = self.fs.put(
@@ -144,6 +158,10 @@ class FerretDBRepository(DatabaseRepository):
             "file_size": len(content),
             "uploaded_at": datetime.now(UTC),
         }
+
+        if extracted_rubric is not None:
+            file_data["extracted_rubric"] = extracted_rubric.model_dump()
+
         result = self.files_collection.insert_one(file_data)
         file_id = str(result.inserted_id)
 

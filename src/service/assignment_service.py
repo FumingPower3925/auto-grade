@@ -1,5 +1,6 @@
 from src.repository.db.factory import get_database_repository
 from src.repository.db.models import AssignmentModel, FileModel
+from src.service.rubric_service import RubricService
 
 
 class AssignmentService:
@@ -72,7 +73,12 @@ class AssignmentService:
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
 
-        return self.db_repository.store_file(assignment_id, filename, content, content_type, "rubric")
+        rubric_service = RubricService()
+        extracted_rubric = rubric_service.parse_rubric(content, content_type)
+
+        return self.db_repository.store_file(
+            assignment_id, filename, content, content_type, "rubric", extracted_rubric
+        )
 
     def upload_relevant_document(self, assignment_id: str, filename: str, content: bytes, content_type: str) -> str:
         """Upload a relevant document or example for an assignment.

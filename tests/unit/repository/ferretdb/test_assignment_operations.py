@@ -325,6 +325,51 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_store_file_with_extracted_rubric(
+        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
+    ) -> None:
+        """Test storing file with extracted rubric data."""
+        from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
+
+        assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
+        file_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
+
+        mock_files_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_assignments_collection = MagicMock()
+
+        mock_fs = mock_gridfs.return_value
+        mock_fs.put.return_value = gridfs_id
+
+        mock_insert_result = MagicMock()
+        mock_insert_result.inserted_id = file_id
+        mock_files_collection.insert_one.return_value = mock_insert_result
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+        repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
+
+        extracted_rubric = ExtractedRubricModel(
+            title="Test Rubric",
+            total_points=100,
+            criteria=[RubricCriterionModel(name="Quality", max_points=50)],
+            raw_text="Raw text",
+        )
+
+        result = repo.store_file(
+            str(assignment_id), "rubric.pdf", b"content", "application/pdf", "rubric", extracted_rubric
+        )
+
+        assert result == str(file_id)
+
+        call_args = mock_files_collection.insert_one.call_args[0][0]
+        assert "extracted_rubric" in call_args
+        assert call_args["extracted_rubric"]["title"] == "Test Rubric"
+        assert call_args["extracted_rubric"]["total_points"] == 100
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
     def test_get_file(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test retrieving a file."""
         file_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
