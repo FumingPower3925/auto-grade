@@ -1,44 +1,30 @@
-FROM quay.io/lib/python:3.13.7-slim AS base
+# syntax=docker/dockerfile:1
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS base
 
 RUN apt-get update && apt-get --no-install-recommends install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PIP_TIMEOUT=300 \
-    PIP_RETRIES=10 \
-    PIP_DEFAULT_TIMEOUT=300 \
-    PYTHONUNBUFFERED=1
-
-RUN pip install --no-cache-dir --timeout 300 poetry
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN python -m venv /app/venv
-ENV PATH="/app/venv/bin:$PATH" \
-    VIRTUAL_ENV=/app/venv \
-    PYTHONPATH=/app \
-    POETRY_HTTP_TIMEOUT=300 \
-    POETRY_INSTALLER_MAX_WORKERS=10 \
-    POETRY_INSTALLER_PARALLEL=true \
-    POETRY_VIRTUALENVS_CREATE=false
-
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
 FROM base AS production
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=cache,target=/root/.cache/pypoetry \
-    pip install --no-cache-dir --timeout 300 pydantic-core==2.33.2 && \
-    poetry install --only=main --no-interaction --no-ansi
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
 
 COPY config/ ./config/
 COPY src/ ./src/
 COPY static/ ./static/
 COPY main.py ./
 
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /home/appuser/.cache && \
+    chown -R appuser:appuser /app /home/appuser
 
 USER appuser
 
@@ -47,7 +33,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-CMD ["python", "main.py"]
+CMD ["uv", "run", "python", "main.py"]
 
 FROM base AS test
 
@@ -69,10 +55,8 @@ RUN apt-get update && apt-get --no-install-recommends install -y \
     libxtst6 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=type=cache,target=/root/.cache/pypoetry \
-    pip install --no-cache-dir --timeout 300 pydantic-core==2.33.2 && \
-    poetry install --with dev --no-interaction --no-ansi
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project
 
 COPY config/ ./config/
 COPY src/ ./src/
@@ -80,11 +64,11 @@ COPY tests/ ./tests/
 COPY main.py ./
 COPY .coveragerc ./
 
-RUN playwright install chromium && \
+RUN uv run playwright install chromium && \
     mkdir -p /home/appuser/.cache && \
     cp -r /root/.cache/ms-playwright /home/appuser/.cache/ && \
     chown -R appuser:appuser /app /home/appuser/.cache
 
 USER appuser
 
-CMD ["python", "-m", "pytest", "tests/", "-v", "--tb=short"]
+CMD ["uv", "run", "python", "-m", "pytest", "tests/", "-v", "--tb=short"]
