@@ -5,6 +5,7 @@ port = 8080
 [llm]
 provider = "openai"
 model = "o4-mini"
+base_url = "https://api.openai.com/v1"
 
 [database]
 type = "ferretdb"

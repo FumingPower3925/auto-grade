@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 from pypdf import PdfReader
 
+from config.config import get_config
 from src.repository.db.factory import get_database_repository
 from src.repository.db.models import DeliverableModel
 
@@ -18,7 +19,10 @@ class DeliverableService:
 
     def __init__(self) -> None:
         self.db_repository = get_database_repository()
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        self.llm_api_key = os.getenv("LLM_API_KEY", "")
+        config = get_config()
+        self.llm_base_url = config.llm.base_url
+        self.llm_model = config.llm.model
 
     def extract_student_name_from_pdf(self, pdf_content: bytes) -> tuple[str, str | None]:
         """Extract student name from PDF content using PyPDF2.
@@ -48,8 +52,8 @@ class DeliverableService:
 
             student_name = self.extract_name_from_text(extracted_text)
 
-            if student_name == "Unknown" and self.openai_api_key and extracted_text:
-                student_name = self.extract_name_with_openai(extracted_text[:2000])
+            if student_name == "Unknown" and self.llm_api_key and extracted_text:
+                student_name = self.extract_name_with_llm(extracted_text[:2000])
 
             return (student_name, extracted_text[:5000] if extracted_text else None)
 
@@ -57,8 +61,8 @@ class DeliverableService:
             logger.error(f"Failed to extract text from PDF: {e}")
             return ("Unknown", None)
 
-    def extract_name_with_openai(self, text: str) -> str:
-        """Extract student name using OpenAI API.
+    def extract_name_with_llm(self, text: str) -> str:
+        """Extract student name using LLM API (OpenAI-compatible).
 
         Args:
             text: The extracted text from the PDF.
@@ -67,8 +71,8 @@ class DeliverableService:
             The extracted student name or "Unknown".
         """
         try:
-            url = "https://api.openai.com/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {self.openai_api_key}", "Content-Type": "application/json"}
+            url = f"{self.llm_base_url}/chat/completions"
+            headers = {"Authorization": f"Bearer {self.llm_api_key}", "Content-Type": "application/json"}
 
             prompt = (
                 "Extract the student's full name from the following text. "
@@ -79,7 +83,7 @@ class DeliverableService:
             )
 
             data: dict[str, Any] = {
-                "model": "gpt-3.5-turbo",
+                "model": self.llm_model,
                 "messages": [
                     {
                         "role": "system",
@@ -100,15 +104,15 @@ class DeliverableService:
                 cleaned_name = self.clean_student_name(name)
 
                 if cleaned_name != "Unknown":
-                    logger.info(f"OpenAI extracted student name: {cleaned_name}")
+                    logger.info(f"LLM extracted student name: {cleaned_name}")
                     return cleaned_name
             else:
-                logger.warning(f"OpenAI API returned status {response.status_code}")
+                logger.warning(f"LLM API returned status {response.status_code}")
 
         except httpx.TimeoutException:
-            logger.warning("OpenAI API request timed out")
+            logger.warning("LLM API request timed out")
         except Exception as e:
-            logger.error(f"Failed to extract name with OpenAI: {e}")
+            logger.error(f"Failed to extract name with LLM: {e}")
 
         return "Unknown"
 
