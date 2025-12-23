@@ -223,8 +223,8 @@ class TestRubricCriterionModel:
 
         assert criterion.name == "Code Quality"
         assert criterion.description == "Quality of code structure"
-        assert criterion.max_points == 25.0
-        assert criterion.weight == 0.25
+        assert criterion.max_points == pytest.approx(25.0)
+        assert criterion.weight == pytest.approx(0.25)
 
     def test_rubric_criterion_with_defaults(self) -> None:
         """Test RubricCriterionModel with default values."""
@@ -248,7 +248,7 @@ class TestRubricCriterionModel:
 
         criterion = RubricCriterionModel(name="Test", max_points=10, weight=0.333)
 
-        assert criterion.weight == 0.33
+        assert criterion.weight == pytest.approx(0.33)
 
 
 class TestExtractedRubricModel:

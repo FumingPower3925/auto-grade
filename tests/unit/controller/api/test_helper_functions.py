@@ -123,10 +123,10 @@ class TestConvertExtractedRubric:
 
         assert result is not None
         assert result.title == "Test Rubric"
-        assert result.total_points == 100.0
+        assert result.total_points == pytest.approx(100.0)
         assert len(result.criteria) == 2
         assert result.criteria[0].name == "Quality"
-        assert result.criteria[0].weight == 0.5
+        assert result.criteria[0].weight == pytest.approx(0.5)
         assert result.criteria[1].name == "Style"
         assert result.criteria[1].weight is None
         assert result.raw_text == "Raw rubric text"

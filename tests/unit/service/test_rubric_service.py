@@ -105,7 +105,7 @@ class TestRubricService:
             assert len(result.criteria) == 1
             assert result.criteria[0].name == "Quality"
             assert result.criteria[0].max_points == 50
-            assert result.criteria[0].weight == 0.5
+            assert result.criteria[0].weight == pytest.approx(0.5)
 
     @patch("src.service.rubric_service.get_config")
     def test_extract_rubric_with_llm_no_api_key(self, mock_get_config: MagicMock) -> None:
