@@ -9,6 +9,7 @@ class ServerConfig(BaseModel):
 class LLMConfig(BaseModel):
     provider: str = "openai"
     model: str = "o4-mini"
+    base_url: str = "https://api.openai.com/v1"
 
 
 class DatabaseConfig(BaseModel):
