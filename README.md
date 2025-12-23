@@ -8,7 +8,7 @@
 [![Security Scan](https://github.com/FumingPower3925/auto-grade/actions/workflows/security.yaml/badge.svg)](https://github.com/FumingPower3925/auto-grade/actions/workflows/security.yaml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=FumingPower3925_auto-grade&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=FumingPower3925_auto-grade)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=FumingPower3925_auto-grade&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=FumingPower3925_auto-grade)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -73,16 +73,16 @@ docker compose up --build -d auto-grade
 docker compose --profile test run --build --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test
 
 # Run only unit tests (with 100% coverage requirement)
-docker compose --profile test run --build --rm test python -m pytest tests/unit/ -v --cov-fail-under=100
+docker compose --profile test run --build --rm test uv run pytest tests/unit/ -v --cov-fail-under=100
 
 # Run only integration tests
-docker compose --profile test run --build --rm test python -m pytest tests/integration/ -v
+docker compose --profile test run --build --rm test uv run pytest tests/integration/ -v
 
 # Run e2e tests
-docker compose --profile test run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test python -m pytest tests/e2e/ -v
+docker compose --profile test run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test uv run pytest tests/e2e/ -v
 
 # Run tests with coverage report
-docker compose --profile test run --build --rm test python -m pytest tests/unit/ tests/integration/ tests/e2e -v --cov=src --cov=config --cov-report=term
+docker compose --profile test run --build --rm test uv run pytest tests/unit/ tests/integration/ tests/e2e -v --cov=src --cov=config --cov-report=term
 ```
 
 ### Code Quality
@@ -102,11 +102,11 @@ docker compose run --rm test ruff format .
 
 ### Package Management
 ```bash
-# Update poetry.lock file after changing dependencies
-poetry lock
+# Update uv.lock file after changing dependencies
+uv lock
 
 # Install/update all dependencies from lock file
-poetry install
+uv sync
 ```
 
 ### Docker Management
@@ -165,12 +165,12 @@ Any and all contributions are welcome!
 ### Development Requirements
 - Python 3.13+
 - Docker and Docker Compose
-- Poetry for dependency management
+- UV for dependency management
 - 100% test coverage for new code
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## Author
 
