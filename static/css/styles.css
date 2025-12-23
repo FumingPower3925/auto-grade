@@ -15,7 +15,7 @@ body {
 .navbar {
     background-color: #fff;
     padding: 10px 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -37,7 +37,7 @@ body {
     padding: 40px 0;
     background-color: #fff;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .header-section h1 {
@@ -63,12 +63,12 @@ body {
 }
 
 .btn-primary {
-    background-color: #007bff;
+    background-color: #0056b3;
     color: white;
 }
 
 .btn-primary:hover {
-    background-color: #0056b3;
+    background-color: #004494;
 }
 
 .btn-secondary {
@@ -113,7 +113,7 @@ body {
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 15px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: box-shadow 0.2s ease;
 }
 
@@ -124,7 +124,7 @@ body {
 }
 
 .assignment-card:hover {
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     cursor: pointer;
 }
 
@@ -174,7 +174,7 @@ body {
     background-color: #fff;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .deliverables-grid {
@@ -194,7 +194,7 @@ body {
 
 .deliverable-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .deliverable-header {
@@ -307,7 +307,7 @@ body {
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
 }
 
 .modal-content {
@@ -317,7 +317,7 @@ body {
     border-radius: 8px;
     width: 80%;
     max-width: 500px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .modal-small {
@@ -420,7 +420,7 @@ body {
 .form-group input:focus {
     outline: none;
     border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .form-group small {
@@ -583,7 +583,7 @@ body {
     background-color: #fff;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .info-card h3 {
@@ -630,7 +630,7 @@ body {
     background-color: #fff;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .section-header {
@@ -684,25 +684,25 @@ body {
     .container {
         padding: 15px;
     }
-    
+
     .assignment-details {
         flex-direction: column;
         gap: 10px;
     }
-    
+
     .modal-content {
         width: 95%;
         margin: 5% auto;
     }
-    
+
     .info-grid {
         grid-template-columns: 1fr;
     }
-    
+
     .file-item {
         flex-wrap: wrap;
     }
-    
+
     .deliverables-grid {
         grid-template-columns: 1fr;
     }

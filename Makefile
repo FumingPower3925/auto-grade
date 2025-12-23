@@ -23,14 +23,14 @@ test: ## Run all tests
 	docker compose --profile test run --rm test
 
 test-unit: ## Run unit tests with coverage
-	docker compose --profile test run --rm test python -m pytest tests/unit/ -v --cov=src --cov=config --cov-fail-under=100
+	docker compose --profile test run --rm test uv run pytest tests/unit/ -v --cov=src --cov=config --cov-fail-under=100
 
 test-integration: ## Run integration tests
-	docker compose --profile test run --rm test python -m pytest tests/integration/ -v
+	docker compose --profile test run --rm test uv run pytest tests/integration/ -v
 
 test-e2e: ## Run e2e tests
 	docker compose up -d auto-grade ferretdb
-	docker compose --profile test run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test python -m pytest tests/e2e/ -v
+	docker compose --profile test run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test uv run pytest tests/e2e/ -v
 	docker compose down
 
 format: ## Format code with ruff
@@ -52,18 +52,18 @@ safety: ## Check dependencies for vulnerabilities
 	docker compose --profile test run --rm test safety check
 
 coverage: ## Generate coverage report
-	docker compose --profile test run --rm test python -m pytest tests/unit/ --cov=src --cov=config --cov-report=html --cov-report=term
+	docker compose --profile test run --rm test uv run pytest tests/unit/ --cov=src --cov=config --cov-report=html --cov-report=term
 	@echo "Coverage report generated in coverage/htmlcov/index.html"
 
 clean: ## Clean up Docker resources
 	docker compose down --rmi all --volumes
 	docker system prune -f
 
-lock: ## Update poetry.lock file
-	poetry lock
+lock: ## Update uv.lock file
+	uv lock
 
 update: ## Update all dependencies
-	poetry update
+	uv sync --upgrade
 
 ci-local: ## Run CI checks locally (mimics GitHub Actions)
 	@echo "Running CI checks locally..."

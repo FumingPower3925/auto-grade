@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 0 * * 1'
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   workflow_dispatch:
 
 jobs:
@@ -49,8 +49,8 @@ jobs:
     - name: Install and run safety check
       run: |
         pip install safety
-        pip install poetry
-        poetry export -f requirements.txt --without-hashes | safety check --stdin
+        pip install uv
+        uv export --format requirements-txt --no-hashes | safety check --stdin
       continue-on-error: true
     
     - name: Run bandit security linter

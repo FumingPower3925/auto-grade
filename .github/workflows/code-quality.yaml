@@ -24,11 +24,11 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install poetry
-        poetry install --only dev
+        pip install uv
+        uv sync --group dev
     
     - name: Run mypy type checking
-      run: poetry run mypy src/ config/ --ignore-missing-imports
+      run: uv run mypy src/ config/ --ignore-missing-imports
       continue-on-error: true
     
     - name: Run bandit security check
@@ -51,7 +51,7 @@ jobs:
       run: |
         mkdir -p coverage
         chmod 777 coverage
-        docker compose run --rm test python -m pytest tests/unit/ \
+        docker compose run --rm test uv run pytest tests/unit/ \
           --cov=src \
           --cov=config \
           --cov-report=xml:/app/coverage/coverage.xml \

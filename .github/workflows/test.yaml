@@ -60,7 +60,7 @@ jobs:
       run: |
         mkdir -p coverage
         chmod 777 coverage
-        docker compose run --rm test python -m pytest tests/unit/ \
+        docker compose run --rm test uv run pytest tests/unit/ \
           --cov=src \
           --cov=config \
           --cov-report=xml:/app/coverage/coverage.xml \
@@ -138,7 +138,7 @@ jobs:
     
     - name: Run integration tests
       run: |
-        docker compose run --rm test python -m pytest tests/integration/ -v --tb=short
+        docker compose run --rm test uv run pytest tests/integration/ -v --tb=short
     
     - name: View logs on failure
       if: failure()
@@ -191,7 +191,7 @@ jobs:
       run: |
         docker compose run --rm \
           -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 \
-          test python -m pytest tests/e2e/ -v \
+          test uv run pytest tests/e2e/ -v \
           --browser chromium \
           --screenshot=only-on-failure \
           --video=retain-on-failure
