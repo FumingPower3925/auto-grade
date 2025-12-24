@@ -1,3 +1,5 @@
+from typing import Any
+
 from src.repository.db.factory import get_database_repository
 from src.repository.db.models import AssignmentModel, FileModel
 from src.service.rubric_service import RubricService
@@ -57,7 +59,7 @@ class AssignmentService:
         """
         return self.db_repository.delete_assignment(assignment_id)
 
-    def upload_rubric(self, assignment_id: str, filename: str, content: bytes, content_type: str) -> str:
+    async def upload_rubric(self, assignment_id: str, filename: str, content: bytes, content_type: str) -> str:
         """Upload an evaluation rubric for an assignment.
 
         Args:
@@ -74,7 +76,7 @@ class AssignmentService:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
 
         rubric_service = RubricService()
-        extracted_rubric = rubric_service.parse_rubric(content, content_type)
+        extracted_rubric = await rubric_service.parse_rubric(content, content_type)
 
         return self.db_repository.store_file(
             assignment_id, filename, content, content_type, "rubric", extracted_rubric
@@ -130,3 +132,71 @@ class AssignmentService:
             A list of relevant document files.
         """
         return self.db_repository.list_files_by_assignment(assignment_id, "relevant_document")
+
+    def update_rubric(
+        self,
+        rubric_id: str,
+        title: str | None = None,
+        total_points: float | None = None,
+        criteria: list[dict[str, Any]] | None = None,
+    ) -> bool:
+        """Update an evaluation rubric's extracted data.
+
+        Args:
+            rubric_id: The ID of the rubric file to update.
+            title: Optional new title.
+            total_points: Optional new total points.
+            criteria: Optional new list of criteria.
+
+        Returns:
+            True if the rubric was updated, False otherwise.
+        """
+        file = self.db_repository.get_file(rubric_id)
+        if not file or file.file_type != "rubric":
+            raise ValueError(f"Rubric with ID {rubric_id} not found")
+
+        from src.repository.db.models import ExtractedRubricModel, GradeLevel, RubricCriterionModel
+
+        # Build new extracted rubric from existing or create new
+        existing = file.extracted_rubric
+        new_title = title if title is not None else (existing.title if existing else None)
+        new_total = total_points if total_points is not None else (existing.total_points if existing else None)
+        raw_text = existing.raw_text if existing else None
+
+        new_criteria = []
+        if criteria is not None:
+            for c in criteria:
+                max_pts = c.get("max_points", 0)
+                weight_val = c.get("weight")
+
+                # Parse grades for this criterion
+                grades = []
+                for g in c.get("grades", []):
+                    grades.append(
+                        GradeLevel(
+                            label=str(g.get("label", "Unnamed")),
+                            points=float(g.get("points", 0)),
+                            description=str(g.get("description", "")),
+                        )
+                    )
+
+                new_criteria.append(
+                    RubricCriterionModel(
+                        name=str(c.get("name", "Unnamed")),
+                        max_points=float(max_pts) if max_pts is not None else 0.0,
+                        weight=float(weight_val) if weight_val is not None else None,
+                        grades=grades,
+                    )
+                )
+        elif existing:
+            new_criteria = existing.criteria
+
+        extracted_rubric = ExtractedRubricModel(
+            title=new_title,
+            total_points=new_total,
+            criteria=new_criteria,
+            raw_text=raw_text,
+        )
+
+        return self.db_repository.update_file(rubric_id, extracted_rubric=extracted_rubric)
+

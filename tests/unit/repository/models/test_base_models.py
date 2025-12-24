@@ -212,19 +212,24 @@ class TestRubricCriterionModel:
 
     def test_create_rubric_criterion(self) -> None:
         """Test creating a RubricCriterionModel."""
-        from src.repository.db.models import RubricCriterionModel
+        from src.repository.db.models import GradeLevel, RubricCriterionModel
 
+        grades = [
+            GradeLevel(label="Excellent", points=25.0, description="Outstanding work"),
+            GradeLevel(label="Good", points=20.0, description="Good work"),
+        ]
         criterion = RubricCriterionModel(
             name="Code Quality",
-            description="Quality of code structure",
             max_points=25.0,
             weight=0.25,
+            grades=grades,
         )
 
         assert criterion.name == "Code Quality"
-        assert criterion.description == "Quality of code structure"
         assert criterion.max_points == pytest.approx(25.0)
         assert criterion.weight == pytest.approx(0.25)
+        assert len(criterion.grades) == 2
+        assert criterion.grades[0].label == "Excellent"
 
     def test_rubric_criterion_with_defaults(self) -> None:
         """Test RubricCriterionModel with default values."""
@@ -232,7 +237,7 @@ class TestRubricCriterionModel:
 
         criterion = RubricCriterionModel(name="Test", max_points=10)
 
-        assert criterion.description == ""
+        assert criterion.grades == []
         assert criterion.weight is None
 
     def test_rubric_criterion_weight_validation(self) -> None:
@@ -249,6 +254,16 @@ class TestRubricCriterionModel:
         criterion = RubricCriterionModel(name="Test", max_points=10, weight=0.333)
 
         assert criterion.weight == pytest.approx(0.33)
+
+    def test_rubric_criterion_max_grades_validation(self) -> None:
+        """Test that criterion cannot have more than 10 grades."""
+        from src.repository.db.models import GradeLevel, RubricCriterionModel
+
+        # 11 grades should fail
+        grades = [GradeLevel(label=f"Grade {i}", points=i, description="") for i in range(11)]
+
+        with pytest.raises(ValidationError):
+            RubricCriterionModel(name="Test", max_points=10, grades=grades)
 
 
 class TestExtractedRubricModel:

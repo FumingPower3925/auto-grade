@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bson import ObjectId
@@ -100,7 +100,8 @@ class TestAssignmentService:
 
     @patch("src.service.assignment_service.RubricService")
     @patch("src.service.assignment_service.get_database_repository")
-    def test_upload_rubric_success(self, mock_get_repo: MagicMock, mock_rubric_service: MagicMock) -> None:
+    @pytest.mark.asyncio
+    async def test_upload_rubric_success(self, mock_get_repo: MagicMock, mock_rubric_service: MagicMock) -> None:
         """Test successful rubric upload."""
         mock_repo = MagicMock()
         mock_assignment = self._create_mock_assignment()
@@ -110,11 +111,12 @@ class TestAssignmentService:
 
         mock_extracted_rubric = ExtractedRubricModel(title="Test Rubric", total_points=100, criteria=[])
         mock_rubric_service_instance = MagicMock()
-        mock_rubric_service_instance.parse_rubric.return_value = mock_extracted_rubric
+        # Make parse_rubric awaitable
+        mock_rubric_service_instance.parse_rubric = AsyncMock(return_value=mock_extracted_rubric)
         mock_rubric_service.return_value = mock_rubric_service_instance
 
         service = AssignmentService()
-        file_id = service.upload_rubric("assignment_id", "rubric.pdf", b"content", "application/pdf")
+        file_id = await service.upload_rubric("assignment_id", "rubric.pdf", b"content", "application/pdf")
 
         assert file_id == "file_id_123"
         mock_rubric_service_instance.parse_rubric.assert_called_once_with(b"content", "application/pdf")
@@ -123,7 +125,8 @@ class TestAssignmentService:
         )
 
     @patch("src.service.assignment_service.get_database_repository")
-    def test_upload_rubric_assignment_not_found(self, mock_get_repo: MagicMock) -> None:
+    @pytest.mark.asyncio
+    async def test_upload_rubric_assignment_not_found(self, mock_get_repo: MagicMock) -> None:
         """Test rubric upload when assignment doesn't exist."""
         mock_repo = MagicMock()
         mock_repo.get_assignment.return_value = None
@@ -132,7 +135,7 @@ class TestAssignmentService:
         service = AssignmentService()
 
         with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
-            service.upload_rubric("test_id", "rubric.pdf", b"content", "application/pdf")
+            await service.upload_rubric("test_id", "rubric.pdf", b"content", "application/pdf")
 
     @patch("src.service.assignment_service.get_database_repository")
     def test_upload_relevant_document_success(self, mock_get_repo: MagicMock) -> None:
@@ -240,3 +243,113 @@ class TestAssignmentService:
             file_type="rubric",
             uploaded_at=datetime.now(UTC),
         )
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_update_rubric_success(self, mock_get_repo: MagicMock) -> None:
+        """Test successful rubric update."""
+        mock_repo = MagicMock()
+        rubric_file = self._create_mock_file("rubric.pdf")
+        rubric_file.extracted_rubric = ExtractedRubricModel(
+            title="Old Title", total_points=50, criteria=[], raw_text="raw"
+        )
+        mock_repo.get_file.return_value = rubric_file
+        mock_repo.update_file.return_value = True
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.update_rubric(
+            rubric_id=str(rubric_file.id),
+            title="New Title",
+            total_points=100,
+        )
+
+        assert result is True
+        mock_repo.update_file.assert_called_once()
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_update_rubric_not_found(self, mock_get_repo: MagicMock) -> None:
+        """Test update_rubric when rubric not found."""
+        mock_repo = MagicMock()
+        mock_repo.get_file.return_value = None
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+
+        with pytest.raises(ValueError, match="Rubric with ID .* not found"):
+            service.update_rubric("nonexistent_id")
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_update_rubric_wrong_file_type(self, mock_get_repo: MagicMock) -> None:
+        """Test update_rubric when file is not a rubric."""
+        mock_repo = MagicMock()
+        doc_file = self._create_mock_file("document.pdf")
+        doc_file.file_type = "relevant_document"
+        mock_repo.get_file.return_value = doc_file
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+
+        with pytest.raises(ValueError, match="Rubric with ID .* not found"):
+            service.update_rubric(str(doc_file.id))
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_update_rubric_with_criteria(self, mock_get_repo: MagicMock) -> None:
+        """Test update_rubric with new criteria."""
+        mock_repo = MagicMock()
+        rubric_file = self._create_mock_file("rubric.pdf")
+        rubric_file.extracted_rubric = None
+        mock_repo.get_file.return_value = rubric_file
+        mock_repo.update_file.return_value = True
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.update_rubric(
+            rubric_id=str(rubric_file.id),
+            title="Test",
+            total_points=100,
+            criteria=[
+                {
+                    "name": "Quality",
+                    "max_points": 50,
+                    "weight": 0.5,
+                    "grades": [
+                        {"label": "Excellent", "points": 50, "description": "Outstanding"},
+                        {"label": "Good", "points": 40, "description": "Good work"},
+                    ],
+                },
+                {"name": "Style", "max_points": 50, "weight": None, "grades": []},
+            ],
+        )
+
+        assert result is True
+        call_kwargs = mock_repo.update_file.call_args[1]
+        assert call_kwargs["extracted_rubric"].title == "Test"
+        assert len(call_kwargs["extracted_rubric"].criteria) == 2
+        assert len(call_kwargs["extracted_rubric"].criteria[0].grades) == 2
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_update_rubric_preserve_existing_criteria(self, mock_get_repo: MagicMock) -> None:
+        """Test update_rubric preserves existing criteria when not provided."""
+        from src.repository.db.models import RubricCriterionModel
+
+        mock_repo = MagicMock()
+        rubric_file = self._create_mock_file("rubric.pdf")
+        existing_criteria = [RubricCriterionModel(name="Existing", max_points=10)]
+        rubric_file.extracted_rubric = ExtractedRubricModel(
+            title="Old", total_points=50, criteria=existing_criteria, raw_text="raw"
+        )
+        mock_repo.get_file.return_value = rubric_file
+        mock_repo.update_file.return_value = True
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.update_rubric(
+            rubric_id=str(rubric_file.id),
+            title="New Title",
+        )
+
+        assert result is True
+        call_kwargs = mock_repo.update_file.call_args[1]
+        assert len(call_kwargs["extracted_rubric"].criteria) == 1
+        assert call_kwargs["extracted_rubric"].criteria[0].name == "Existing"
+

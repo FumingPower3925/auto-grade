@@ -1,6 +1,6 @@
 import io
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from bson import ObjectId
@@ -8,7 +8,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from src.controller.api.api import app
-from src.repository.db.models import AssignmentModel, FileModel
+from src.repository.db.models import AssignmentModel, ExtractedRubricModel, FileModel, RubricCriterionModel
 
 
 class TestAssignmentEndpoints:
@@ -168,7 +168,7 @@ class TestAssignmentEndpoints:
     ) -> None:
         """Test rubric upload with various exceptions."""
         mock_service = MagicMock()
-        mock_service.upload_rubric.side_effect = side_effect
+        mock_service.upload_rubric = AsyncMock(side_effect=side_effect)
         mock_service_class.return_value = mock_service
 
         response = self.client.post(
@@ -182,7 +182,7 @@ class TestAssignmentEndpoints:
     def test_upload_rubric_success(self, mock_service_class: MagicMock) -> None:
         """Test successful rubric upload."""
         mock_service = MagicMock()
-        mock_service.upload_rubric.return_value = "file_id"
+        mock_service.upload_rubric = AsyncMock(return_value="file_id")
         mock_service_class.return_value = mock_service
 
         response = self.client.post(
@@ -319,3 +319,77 @@ class TestAssignmentEndpoints:
             file_type="rubric",
             uploaded_at=datetime.now(UTC),
         )
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_update_rubric_success(self, mock_service_class: MagicMock) -> None:
+        """Test successful rubric update."""
+        mock_service = MagicMock()
+        mock_service.update_rubric.return_value = True
+
+        mock_file = self._create_mock_file()
+        mock_file.extracted_rubric = ExtractedRubricModel(
+            title="Updated Title",
+            total_points=100,
+            criteria=[RubricCriterionModel(name="Quality", max_points=50)],
+            raw_text="raw",
+        )
+        mock_service.get_file.return_value = mock_file
+        mock_service_class.return_value = mock_service
+
+        response = self.client.patch(
+            "/rubrics/rubric_id",
+            json={"title": "Updated Title", "total_points": 100, "criteria": [{"name": "Quality", "max_points": 50}]},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["title"] == "Updated Title"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_update_rubric_not_found(self, mock_service_class: MagicMock) -> None:
+        """Test updating non-existent rubric."""
+        mock_service = MagicMock()
+        mock_service.update_rubric.side_effect = ValueError("Rubric not found")
+        mock_service_class.return_value = mock_service
+
+        response = self.client.patch("/rubrics/non_existent", json={"title": "New Title"})
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_update_rubric_update_failure(self, mock_service_class: MagicMock) -> None:
+        """Test rubric update when update returns false."""
+        mock_service = MagicMock()
+        mock_service.update_rubric.return_value = False
+        mock_service_class.return_value = mock_service
+
+        response = self.client.patch("/rubrics/rubric_id", json={"title": "New Title"})
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to update rubric"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_update_rubric_exception(self, mock_service_class: MagicMock) -> None:
+        """Test rubric update with exception."""
+        mock_service = MagicMock()
+        mock_service.update_rubric.side_effect = Exception("DB error")
+        mock_service_class.return_value = mock_service
+
+        response = self.client.patch("/rubrics/rubric_id", json={"title": "New Title"})
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to update rubric"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_update_rubric_retrieval_failure(self, mock_service_class: MagicMock) -> None:
+        """Test rubric update when retrieval after update fails."""
+        mock_service = MagicMock()
+        mock_service.update_rubric.return_value = True
+        mock_service.get_file.return_value = None
+        mock_service_class.return_value = mock_service
+
+        response = self.client.patch("/rubrics/rubric_id", json={"title": "New Title"})
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to retrieve updated rubric"
+

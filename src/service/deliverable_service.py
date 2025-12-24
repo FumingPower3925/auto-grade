@@ -22,7 +22,7 @@ class DeliverableService:
         self.llm_api_key = os.getenv("LLM_API_KEY", "")
         config = get_config()
         self.llm_base_url = config.llm.base_url
-        self.llm_model = config.llm.model
+        self.llm_model = config.llm.default_model
 
     def extract_student_name_from_pdf(self, pdf_content: bytes) -> tuple[str, str | None]:
         """Extract student name from PDF content using PyPDF2.

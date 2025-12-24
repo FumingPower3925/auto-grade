@@ -8,8 +8,15 @@ class ServerConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     provider: str = "openai"
-    model: str = "o4-mini"
+    default_model: str = "o4-mini"
+    smart_model: str = "gpt-5.2"
     base_url: str = "https://api.openai.com/v1"
+
+
+class OCRConfig(BaseModel):
+    provider: str = "mistral"
+    model: str = "mistral-ocr-latest"
+    base_url: str = "https://api.mistral.ai/v1"
 
 
 class DatabaseConfig(BaseModel):

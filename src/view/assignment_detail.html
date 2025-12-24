@@ -74,12 +74,40 @@
                     <div class="file-list">
                         {% if rubrics %}
                         {% for rubric in rubrics %}
-                        <div class="file-item">
-                            <span class="file-name">{{ rubric.filename }}</span>
-                            <span class="file-date">{{ rubric.uploaded_at.strftime('%Y-%m-%d') }}</span>
-                            <a href="/api/files/{{ rubric.id }}" class="btn btn-small" download>
-                                Download
-                            </a>
+                        <div class="file-item rubric-item">
+                            <div class="rubric-info">
+                                <span class="file-name">{{ rubric.filename }}</span>
+                                <span class="file-date">{{ rubric.uploaded_at.strftime('%Y-%m-%d') }}</span>
+                                {% if rubric.extracted_rubric and rubric.extracted_rubric.criteria %}
+                                <span class="criteria-badge">{{ rubric.extracted_rubric.criteria|length }}
+                                    criteria</span>
+                                {% endif %}
+                            </div>
+                            <div class="rubric-actions">
+                                <a href="/api/files/{{ rubric.id }}" class="btn btn-small btn-primary" target="_blank"
+                                    title="Open PDF in new tab">
+                                    <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                    View PDF
+                                </a>
+                                <button class="btn btn-small btn-primary" onclick="showRubricModal('{{ rubric.id }}')"
+                                    title="View and edit rubric criteria">
+                                    <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                    Edit Rubric
+                                </button>
+                            </div>
                         </div>
                         {% endfor %}
                         {% else %}
@@ -121,7 +149,11 @@
             <div class="modal-header">
                 <h2 id="uploadModalTitle">Upload File</h2>
                 <button type="button" class="close" aria-label="Close" onclick="hideUploadModal()">
-                    <span aria-hidden="true">&times;</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
             </div>
             <form id="uploadForm" enctype="multipart/form-data">
@@ -147,7 +179,11 @@
             <div class="modal-header">
                 <h2>Upload Student Deliverables</h2>
                 <button type="button" class="close" aria-label="Close" onclick="hideDeliverableUploadModal()">
-                    <span aria-hidden="true">&times;</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
             </div>
             <div class="modal-body">
@@ -190,7 +226,11 @@
             <div class="modal-header">
                 <h2>Edit Deliverable</h2>
                 <button type="button" class="close" aria-label="Close" onclick="hideEditDeliverableModal()">
-                    <span aria-hidden="true">&times;</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
             </div>
             <form id="editDeliverableForm">
@@ -237,6 +277,86 @@
                     Delete Deliverable
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Rubric Edit Modal -->
+    <div id="rubricModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Edit Rubric</h2>
+                <div class="modal-header-actions">
+                    <button type="button" class="close" aria-label="Expand" onclick="toggleRubricModalExpand()"
+                        title="Expand modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <polyline points="9 21 3 21 3 15"></polyline>
+                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                    </button>
+                    <button type="button" class="close" aria-label="Close" onclick="hideRubricModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Overlay -->
+            <div id="rubricLoadingOverlay" class="loading-overlay">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Parsing rubric...</p>
+            </div>
+
+            <form id="rubricForm">
+                <div class="modal-body">
+                    <div class="rubric-form-grid">
+                        <div class="form-group">
+                            <label for="rubricTitle">Rubric Title:</label>
+                            <input type="text" id="rubricTitle" name="title" placeholder="Enter rubric title">
+                        </div>
+                        <div class="form-group">
+                            <label for="rubricTotalPoints">Total Points:</label>
+                            <input type="number" id="rubricTotalPoints" name="total_points" min="0" step="0.5"
+                                placeholder="Auto-calculated" readonly class="readonly-input">
+                        </div>
+                    </div>
+
+                    <div class="criteria-section">
+                        <div class="criteria-header">
+                            <h3>Grading Criteria</h3>
+                            <button type="button" class="btn btn-small btn-primary" onclick="addCriterion()">
+                                + Add Criterion
+                            </button>
+                        </div>
+                        <div id="criteriaList" class="criteria-list">
+                            <!-- Criteria will be dynamically added here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="hideRubricModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="saveRubricBtn">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Upload Processing Overlay -->
+    <div id="uploadProcessingOverlay" class="upload-processing-overlay">
+        <div class="upload-processing-content">
+            <div class="loading-spinner"></div>
+            <h3>Processing Rubric</h3>
+            <p>Uploading and extracting grading criteria...</p>
         </div>
     </div>
 
@@ -315,7 +435,8 @@
 
         // Deliverable upload modal functions
         function showDeliverableUploadModal() {
-            document.getElementById('deliverableUploadModal').style.display = 'block';
+            document.getElementById('deliverableUploadModal').style.display = 'flex';
+            document.body.classList.add('modal-open');
             selectedDeliverableFiles = [];
             updateSelectedFilesList();
         }
@@ -325,6 +446,7 @@
             document.getElementById('deliverableFileInput').value = '';
             selectedDeliverableFiles = [];
             updateSelectedFilesList();
+            document.body.classList.remove('modal-open');
         }
 
         // File selection
@@ -424,12 +546,14 @@
             document.getElementById('editStudentName').value = studentName;
             document.getElementById('editMark').value = mark === null ? '' : mark;
             document.getElementById('editCertainty').value = certainty === null ? '' : certainty;
-            document.getElementById('editDeliverableModal').style.display = 'block';
+            document.getElementById('editDeliverableModal').style.display = 'flex';
+            document.body.classList.add('modal-open');
         }
 
         function hideEditDeliverableModal() {
             document.getElementById('editDeliverableModal').style.display = 'none';
             document.getElementById('editDeliverableForm').reset();
+            document.body.classList.remove('modal-open');
         }
 
         document.getElementById('editDeliverableForm').addEventListener('submit', async function (e) {
@@ -470,12 +594,14 @@
         // Delete deliverable
         function confirmDeleteDeliverable(id) {
             currentDeleteDeliverableId = id;
-            document.getElementById('deleteConfirmModal').style.display = 'block';
+            document.getElementById('deleteConfirmModal').style.display = 'flex';
+            document.body.classList.add('modal-open');
         }
 
         function hideDeleteConfirmModal() {
             document.getElementById('deleteConfirmModal').style.display = 'none';
             currentDeleteDeliverableId = null;
+            document.body.classList.remove('modal-open');
         }
 
         document.getElementById('confirmDeleteBtn').addEventListener('click', async function () {
@@ -497,7 +623,7 @@
             }
         });
 
-        // Original upload modal functions
+
         function showUploadModal(type) {
             currentUploadType = type;
             const modal = document.getElementById('uploadModal');
@@ -509,12 +635,15 @@
                 title.textContent = 'Upload Relevant Document';
             }
 
-            modal.style.display = 'block';
+
+            modal.style.display = 'flex';
+            document.body.classList.add('modal-open');
         }
 
         function hideUploadModal() {
             document.getElementById('uploadModal').style.display = 'none';
             document.getElementById('uploadForm').reset();
+            document.body.classList.remove('modal-open');
         }
 
         document.getElementById('uploadForm').addEventListener('submit', async function (e) {
@@ -528,20 +657,35 @@
                 ? `/api/assignments/${assignmentId}/rubrics`
                 : `/api/assignments/${assignmentId}/documents`;
 
+            // Show processing overlay for rubric uploads
+            if (currentUploadType === 'rubric') {
+                hideUploadModal();
+                // Re-add modal-open class to keep body scroll disabled during processing
+                document.body.classList.add('modal-open');
+                document.getElementById('uploadProcessingOverlay').classList.add('active');
+            } else {
+                hideUploadModal();
+            }
+
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     body: formData
                 });
 
+                // Hide processing overlay
+                document.getElementById('uploadProcessingOverlay').classList.remove('active');
+                document.body.classList.remove('modal-open');
+
                 if (response.ok) {
-                    hideUploadModal();
                     globalThis.location.reload();
                 } else {
                     const error = await response.json();
                     alert('Error uploading file: ' + (error.detail || 'Unknown error'));
                 }
             } catch (error) {
+                document.getElementById('uploadProcessingOverlay').classList.remove('active');
+                document.body.classList.remove('modal-open');
                 alert('Error uploading file: ' + error.message);
             }
         });
@@ -553,8 +697,336 @@
                 if (event.target.id === 'deliverableUploadModal') hideDeliverableUploadModal();
                 if (event.target.id === 'editDeliverableModal') hideEditDeliverableModal();
                 if (event.target.id === 'deleteConfirmModal') hideDeleteConfirmModal();
+                if (event.target.id === 'rubricModal') hideRubricModal();
             }
         }
+
+        // Rubric Modal Functions
+        let currentRubricId = null;
+        let rubricData = null;
+
+        async function showRubricModal(rubricId) {
+            currentRubricId = rubricId;
+            const modal = document.getElementById('rubricModal');
+            const loadingOverlay = document.getElementById('rubricLoadingOverlay');
+            const rubricForm = document.getElementById('rubricForm');
+
+            // Show modal with loading state
+            modal.style.display = 'flex'; // Use flex for centering
+            document.body.classList.add('modal-open');
+            loadingOverlay.classList.add('active');
+            rubricForm.classList.add('rubric-form-disabled');
+
+            try {
+                // Fetch rubric data from API
+                const response = await fetch(`/api/assignments/${assignmentId}`);
+                const data = await response.json();
+
+                // Find the rubric in evaluation_rubrics
+                const rubric = data.evaluation_rubrics.find(r => r.id === rubricId);
+                if (!rubric) {
+                    hideRubricModal();
+                    alert('Rubric not found');
+                    return;
+                }
+
+                rubricData = rubric.extracted_rubric || { title: null, total_points: null, criteria: [] };
+
+                // Populate form fields
+                // Populate form fields
+                document.getElementById('rubricTitle').value = rubricData.title || '';
+
+                // Render criteria and calc total
+                renderCriteria();
+                calculateTotalPoints();
+
+                // Hide loading, enable form
+                loadingOverlay.classList.remove('active');
+                rubricForm.classList.remove('rubric-form-disabled');
+            } catch (error) {
+                hideRubricModal();
+                alert('Error loading rubric: ' + error.message);
+            }
+        }
+
+        function hideRubricModal() {
+            const modal = document.getElementById('rubricModal');
+            modal.style.display = 'none';
+            modal.querySelector('.modal-large').classList.remove('modal-expanded');
+            document.body.classList.remove('modal-open');
+            document.getElementById('rubricForm').reset();
+            document.getElementById('criteriaList').innerHTML = '';
+            document.getElementById('rubricLoadingOverlay').classList.remove('active');
+            document.getElementById('rubricForm').classList.remove('rubric-form-disabled');
+            currentRubricId = null;
+            rubricData = null;
+        }
+
+        function toggleRubricModalExpand() {
+            const modalContent = document.querySelector('#rubricModal .modal-large');
+            modalContent.classList.toggle('modal-expanded');
+        }
+
+        function renderCriteria() {
+            const criteriaList = document.getElementById('criteriaList');
+            const criteria = rubricData.criteria || [];
+
+            if (criteria.length === 0) {
+                criteriaList.innerHTML = '<p class="no-criteria">No criteria defined. Click "Add Criterion" to add one.</p>';
+                return;
+            }
+
+            criteriaList.innerHTML = criteria.map((criterion, index) => {
+                const name = escapeHtml(criterion.name || 'Unnamed Criterion');
+                const maxPoints = criterion.max_points || 0;
+                const weightPercent = criterion.weight ? Math.round(criterion.weight * 100) : '';
+                const grades = criterion.grades || [];
+
+                const gradesHtml = grades.map((grade, gIndex) => `
+                    <div class="grade-item" data-criterion="${index}" data-grade="${gIndex}">
+                        <div class="grade-row">
+                            <input type="text" class="grade-label" value="${escapeHtml(grade.label || '')}" placeholder="Label (e.g., Excellent)">
+                            <input type="number" class="grade-points" value="${grade.points || 0}" min="0" step="0.5" placeholder="Points">
+                            <button type="button" class="btn btn-small btn-danger btn-icon-only" onclick="removeGrade(${index}, ${gIndex})" title="Remove grade" ${grades.length <= 2 ? 'disabled' : ''}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                        <textarea class="grade-description" placeholder="What achievement looks like at this level" rows="1">${escapeHtml(grade.description || '')}</textarea>
+                    </div>
+                `).join('');
+
+                return `
+                <div class="criterion-item" data-index="${index}">
+                    <div class="criterion-header" onclick="toggleCriterion(${index})">
+                        <div class="criterion-summary">
+                            <span class="criterion-number">#${index + 1}</span>
+                            <span class="criterion-title-preview">${name}</span>
+                            <div class="criterion-meta">
+                                <span>${maxPoints} pts</span>
+                                ${weightPercent ? `<span>${weightPercent}%</span>` : ''}
+                                <span class="grades-count">${grades.length} grades</span>
+                            </div>
+                        </div>
+                        <div class="criterion-actions">
+                            <button type="button" class="btn btn-small btn-danger btn-icon-only" onclick="event.stopPropagation(); removeCriterion(${index})" title="Remove criterion"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                            <svg class="criterion-expand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </div>
+                    </div>
+                    <div class="criterion-fields">
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 3;">
+                                <label>Name:</label>
+                                <input type="text" class="criterion-name" value="${escapeHtml(criterion.name || '')}" placeholder="Criterion name" oninput="updateCriterionPreview(${index})" required>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Max Points:</label>
+                                <input type="number" class="criterion-max-points" value="${maxPoints}" min="0" step="0.5" oninput="updateCriterionPreview(${index})" required>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Weight (%):</label>
+                                <input type="number" class="criterion-weight" value="${weightPercent}" min="0" max="100" step="1" placeholder="Optional" oninput="updateCriterionPreview(${index})">
+                            </div>
+                        </div>
+                        <div class="grades-section">
+                            <div class="grades-header">
+                                <label>Grades of Success:</label>
+                                <button type="button" class="btn btn-small btn-primary" onclick="addGrade(${index})" ${grades.length >= 10 ? 'disabled' : ''}>+ Add Grade</button>
+                            </div>
+                            <div class="grades-list" data-criterion="${index}">
+                                ${gradesHtml || '<p class="no-grades">No grades defined. Click "Add Grade" to add one.</p>'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function addGrade(criterionIndex) {
+            const criterion = rubricData.criteria[criterionIndex];
+            if (!criterion.grades) criterion.grades = [];
+            if (criterion.grades.length >= 10) return;
+
+            criterion.grades.push({ label: '', points: 0, description: '' });
+            renderCriteria();
+            // Expand the criterion and scroll to the new grade
+            const item = document.querySelector(`.criterion-item[data-index="${criterionIndex}"]`);
+            if (item) item.classList.add('expanded');
+        }
+
+        function removeGrade(criterionIndex, gradeIndex) {
+            const criterion = rubricData.criteria[criterionIndex];
+            if (!criterion.grades || criterion.grades.length <= 2) return;
+
+            criterion.grades.splice(gradeIndex, 1);
+            renderCriteria();
+            // Keep the criterion expanded
+            const item = document.querySelector(`.criterion-item[data-index="${criterionIndex}"]`);
+            if (item) item.classList.add('expanded');
+        }
+
+        function toggleCriterion(index) {
+            const item = document.querySelector(`.criterion-item[data-index="${index}"]`);
+            if (item) {
+                item.classList.toggle('expanded');
+            }
+        }
+
+        function updateCriterionPreview(index) {
+            const item = document.querySelector(`.criterion-item[data-index="${index}"]`);
+            if (!item) return;
+
+            const name = item.querySelector('.criterion-name').value || 'Unnamed Criterion';
+            const maxPoints = item.querySelector('.criterion-max-points').value || 0;
+            const weight = item.querySelector('.criterion-weight').value;
+
+            const titlePreview = item.querySelector('.criterion-title-preview');
+            const metaDiv = item.querySelector('.criterion-meta');
+
+            titlePreview.textContent = name;
+            metaDiv.innerHTML = `<span>${maxPoints} pts</span>${weight ? `<span>${weight}%</span>` : ''}`;
+
+            calculateTotalPoints();
+        }
+
+        function calculateTotalPoints() {
+            if (!rubricData || !rubricData.criteria) return;
+
+            // Re-read max points from DOM to get current values even if not saved to rubricData yet
+
+            let total = 0;
+            const items = document.querySelectorAll('.criterion-item');
+            items.forEach(item => {
+                const points = parseFloat(item.querySelector('.criterion-max-points').value) || 0;
+                total += points;
+            });
+
+            document.getElementById('rubricTotalPoints').value = total;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function addCriterion() {
+            if (!rubricData) rubricData = { title: null, total_points: null, criteria: [] };
+            if (!rubricData.criteria) rubricData.criteria = [];
+
+            // Smart grades: use the majority grade count from existing criteria, or default to 3
+            let gradeCount = 3;
+            if (rubricData.criteria.length > 0) {
+                const gradeCounts = rubricData.criteria.map(c => (c.grades || []).length);
+                const countMap = {};
+                gradeCounts.forEach(count => { countMap[count] = (countMap[count] || 0) + 1; });
+                // Find the most common count
+                let maxCount = 0;
+                Object.keys(countMap).forEach(count => {
+                    if (countMap[count] > maxCount) {
+                        maxCount = countMap[count];
+                        gradeCount = parseInt(count);
+                    }
+                });
+            }
+
+            // Clamp between 2 and 10
+            gradeCount = Math.max(2, Math.min(10, gradeCount));
+
+            // Default labels based on common patterns
+            const defaultLabels = ['Excellent', 'Good', 'Satisfactory', 'Needs Improvement', 'Poor',
+                'Inadequate', 'Minimal', 'Basic', 'Limited', 'Unsatisfactory'];
+            const grades = [];
+            for (let i = 0; i < gradeCount; i++) {
+                grades.push({ label: defaultLabels[i] || `Level ${i + 1}`, points: 0, description: '' });
+            }
+
+            rubricData.criteria.push({
+                name: '',
+                max_points: 0,
+                weight: null,
+                grades: grades
+            });
+
+
+
+            renderCriteria();
+            calculateTotalPoints();
+            // Expand and scroll to the new criterion
+            const newIndex = rubricData.criteria.length - 1;
+            const item = document.querySelector(`.criterion-item[data-index="${newIndex}"]`);
+            if (item) {
+                item.classList.add('expanded');
+                item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function removeCriterion(index) {
+            if (rubricData && rubricData.criteria) {
+                rubricData.criteria.splice(index, 1);
+                renderCriteria();
+                calculateTotalPoints();
+            }
+        }
+
+        function collectCriteriaFromForm() {
+            const criteriaItems = document.querySelectorAll('.criterion-item');
+            const criteria = [];
+
+            criteriaItems.forEach(item => {
+                const name = item.querySelector('.criterion-name').value.trim();
+                const maxPoints = parseFloat(item.querySelector('.criterion-max-points').value) || 0;
+                const weightValue = item.querySelector('.criterion-weight').value;
+                // Convert percentage (0-100) to decimal (0-1) for the API
+                const weight = weightValue ? parseFloat(weightValue) / 100 : null;
+
+                // Collect grades for this criterion
+                const grades = [];
+                const gradeItems = item.querySelectorAll('.grade-item');
+                gradeItems.forEach(gradeItem => {
+                    const label = gradeItem.querySelector('.grade-label').value.trim();
+                    const points = parseFloat(gradeItem.querySelector('.grade-points').value) || 0;
+                    const description = gradeItem.querySelector('.grade-description').value.trim();
+                    grades.push({ label, points, description });
+                });
+
+                if (name) {
+                    criteria.push({ name, max_points: maxPoints, weight, grades });
+                }
+            });
+
+            return criteria;
+        }
+
+        document.getElementById('rubricForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            if (!currentRubricId) return;
+
+            const title = document.getElementById('rubricTitle').value.trim() || null;
+            const totalPointsValue = document.getElementById('rubricTotalPoints').value;
+            const totalPoints = totalPointsValue ? parseFloat(totalPointsValue) : null;
+            const criteria = collectCriteriaFromForm();
+
+            try {
+                const response = await fetch(`/api/rubrics/${currentRubricId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, total_points: totalPoints, criteria })
+                });
+
+                if (response.ok) {
+                    hideRubricModal();
+                    hideRubricModal();
+                    // Force reload to update the UI with new total points and criteria
+                    window.location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Error saving rubric: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error saving rubric: ' + error.message);
+            }
+        });
     </script>
 </body>
 
