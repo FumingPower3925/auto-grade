@@ -1,0 +1,70 @@
+<!-- Rubric Edit Modal -->
+<div id="rubricModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Edit Rubric</h2>
+            <div class="modal-header-actions">
+                <button type="button" class="close" aria-label="Expand" onclick="toggleRubricModalExpand()"
+                    title="Expand modal">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <polyline points="9 21 3 21 3 15"></polyline>
+                        <line x1="21" y1="3" x2="14" y2="10"></line>
+                        <line x1="3" y1="21" x2="10" y2="14"></line>
+                    </svg>
+                </button>
+                <button type="button" class="close" aria-label="Close" onclick="hideRubricModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="rubricLoadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Parsing rubric...</p>
+        </div>
+
+        <form id="rubricForm">
+            <div class="modal-body">
+                <div class="rubric-form-grid">
+                    <div class="form-group">
+                        <label for="rubricTitle">Rubric Title:</label>
+                        <input type="text" id="rubricTitle" name="title" placeholder="Enter rubric title">
+                    </div>
+                    <div class="form-group">
+                        <label for="rubricTotalPoints">Total Points:</label>
+                        <input type="number" id="rubricTotalPoints" name="total_points" min="0" step="0.5"
+                            placeholder="Auto-calculated" readonly class="readonly-input">
+                    </div>
+                </div>
+
+                <div class="criteria-section">
+                    <div class="criteria-header">
+                        <h3>Grading Criteria</h3>
+                        <button type="button" class="btn btn-small btn-primary" onclick="addCriterion()">
+                            + Add Criterion
+                        </button>
+                    </div>
+                    <div id="criteriaList" class="criteria-list">
+                        <!-- Criteria will be dynamically added here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideRubricModal()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary" id="saveRubricBtn">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
