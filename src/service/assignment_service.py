@@ -96,20 +96,26 @@ class AssignmentService:
         Returns:
             The ID of the uploaded file.
         """
+        import asyncio
+
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
 
-        # Extract text and generate embedding for vector search
+        # Extract text and generate embedding for vector search (run in thread pool)
         extracted_text = None
         embedding = None
         try:
             from src.service.embedding_service import EmbeddingService
 
             embedding_service = EmbeddingService()
-            extracted_text = embedding_service.extract_text_from_content(content, content_type)
+            extracted_text = await asyncio.to_thread(
+                embedding_service.extract_text_from_content, content, content_type
+            )
             if extracted_text:
-                embedding = embedding_service.generate_embedding(extracted_text)
+                embedding = await asyncio.to_thread(
+                    embedding_service.generate_embedding, extracted_text
+                )
         except Exception:
             # If embedding fails, still store the document without embedding
             pass
