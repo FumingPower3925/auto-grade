@@ -803,6 +803,27 @@ body.modal-open {
     gap: 8px;
 }
 
+/* Document Item Styles */
+.document-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.document-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.document-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .criteria-badge {
     background: linear-gradient(135deg, #4a5fc1 0%, #5e3d8a 100%);
     color: white;

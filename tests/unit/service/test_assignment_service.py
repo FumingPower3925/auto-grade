@@ -390,6 +390,96 @@ class TestAssignmentService:
         assert result == mock_files
         mock_repo.list_files_by_assignment.assert_called_once_with("assignment_id", "relevant_document")
 
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_delete_rubric_success(self, mock_get_repo: MagicMock) -> None:
+        """Test successful rubric deletion."""
+        mock_repo = MagicMock()
+        mock_file = self._create_mock_file("rubric.pdf")
+        mock_file.file_type = "rubric"
+        mock_repo.get_file.return_value = mock_file
+        mock_repo.delete_file.return_value = True
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.delete_rubric("rubric_id")
+
+        assert result is True
+        mock_repo.get_file.assert_called_once_with("rubric_id")
+        mock_repo.delete_file.assert_called_once_with("rubric_id")
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_delete_rubric_not_found(self, mock_get_repo: MagicMock) -> None:
+        """Test deleting non-existent rubric."""
+        mock_repo = MagicMock()
+        mock_repo.get_file.return_value = None
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.delete_rubric("rubric_id")
+
+        assert result is False
+        mock_repo.delete_file.assert_not_called()
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_delete_rubric_wrong_type(self, mock_get_repo: MagicMock) -> None:
+        """Test deleting file that is not a rubric."""
+        mock_repo = MagicMock()
+        mock_file = self._create_mock_file("doc.pdf")
+        mock_file.file_type = "relevant_document"
+        mock_repo.get_file.return_value = mock_file
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.delete_rubric("file_id")
+
+        assert result is False
+        mock_repo.delete_file.assert_not_called()
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_delete_document_success(self, mock_get_repo: MagicMock) -> None:
+        """Test successful document deletion."""
+        mock_repo = MagicMock()
+        mock_file = self._create_mock_file("doc.pdf")
+        mock_file.file_type = "relevant_document"
+        mock_repo.get_file.return_value = mock_file
+        mock_repo.delete_file.return_value = True
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.delete_document("doc_id")
+
+        assert result is True
+        mock_repo.get_file.assert_called_once_with("doc_id")
+        mock_repo.delete_file.assert_called_once_with("doc_id")
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_delete_document_not_found(self, mock_get_repo: MagicMock) -> None:
+        """Test deleting non-existent document."""
+        mock_repo = MagicMock()
+        mock_repo.get_file.return_value = None
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.delete_document("doc_id")
+
+        assert result is False
+        mock_repo.delete_file.assert_not_called()
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_delete_document_wrong_type(self, mock_get_repo: MagicMock) -> None:
+        """Test deleting file that is not a document."""
+        mock_repo = MagicMock()
+        mock_file = self._create_mock_file("rubric.pdf")
+        mock_file.file_type = "rubric"
+        mock_repo.get_file.return_value = mock_file
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.delete_document("file_id")
+
+        assert result is False
+        mock_repo.delete_file.assert_not_called()
+
     def _create_mock_assignment(self, name: str = "Test Assignment") -> AssignmentModel:
         """Create a mock AssignmentModel."""
         return AssignmentModel(

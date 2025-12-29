@@ -352,6 +352,38 @@ async def update_rubric(rubric_id: str, request: UpdateRubricRequest) -> Extract
         raise HTTPException(status_code=500, detail="Failed to update rubric") from e
 
 
+@app.delete("/rubrics/{rubric_id}", tags=["Files"])
+async def delete_rubric(rubric_id: str) -> dict[str, str]:
+    """Delete a rubric and its extracted data."""
+    assignment_service = AssignmentService()
+
+    try:
+        success = assignment_service.delete_rubric(rubric_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Rubric not found")
+        return {"message": "Rubric deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete rubric") from e
+
+
+@app.delete("/files/{file_id}", tags=["Files"])
+async def delete_file(file_id: str) -> dict[str, str]:
+    """Delete a document file and its embeddings."""
+    assignment_service = AssignmentService()
+
+    try:
+        success = assignment_service.delete_document(file_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return {"message": "Document deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete document") from e
+
+
 @app.post("/assignments/{assignment_id}/deliverables", response_model=DeliverableUploadResponse, tags=["Deliverables"])
 async def upload_deliverable(
     assignment_id: str,

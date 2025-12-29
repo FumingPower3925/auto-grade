@@ -206,6 +206,34 @@ class AssignmentService:
         """
         return self.db_repository.list_files_by_assignment(assignment_id, "relevant_document")
 
+    def delete_rubric(self, rubric_id: str) -> bool:
+        """Delete a rubric file.
+
+        Args:
+            rubric_id: The ID of the rubric to delete.
+
+        Returns:
+            True if the rubric was deleted, False otherwise.
+        """
+        file = self.db_repository.get_file(rubric_id)
+        if not file or file.file_type != "rubric":
+            return False
+        return self.db_repository.delete_file(rubric_id)
+
+    def delete_document(self, document_id: str) -> bool:
+        """Delete a document and its embeddings/chunks.
+
+        Args:
+            document_id: The ID of the document to delete.
+
+        Returns:
+            True if the document was deleted, False otherwise.
+        """
+        file = self.db_repository.get_file(document_id)
+        if not file or file.file_type != "relevant_document":
+            return False
+        return self.db_repository.delete_file(document_id)
+
     def search_similar_documents(self, query: str, assignment_id: str | None = None, k: int = 5) -> list[FileModel]:
         """Search for similar documents using semantic search.
 

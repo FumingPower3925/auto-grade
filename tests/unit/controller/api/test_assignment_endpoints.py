@@ -428,3 +428,75 @@ class TestAssignmentEndpoints:
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.json()["detail"] == "Failed to retrieve updated rubric"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_delete_rubric_success(self, mock_service_class: MagicMock) -> None:
+        """Test successful rubric deletion."""
+        mock_service = MagicMock()
+        mock_service.delete_rubric.return_value = True
+        mock_service_class.return_value = mock_service
+
+        response = self.client.delete("/rubrics/rubric_id")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["message"] == "Rubric deleted successfully"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_delete_rubric_not_found(self, mock_service_class: MagicMock) -> None:
+        """Test deleting non-existent rubric."""
+        mock_service = MagicMock()
+        mock_service.delete_rubric.return_value = False
+        mock_service_class.return_value = mock_service
+
+        response = self.client.delete("/rubrics/rubric_id")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json()["detail"] == "Rubric not found"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_delete_rubric_exception(self, mock_service_class: MagicMock) -> None:
+        """Test delete rubric with exception."""
+        mock_service = MagicMock()
+        mock_service.delete_rubric.side_effect = Exception("DB error")
+        mock_service_class.return_value = mock_service
+
+        response = self.client.delete("/rubrics/rubric_id")
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to delete rubric"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_delete_file_success(self, mock_service_class: MagicMock) -> None:
+        """Test successful file deletion."""
+        mock_service = MagicMock()
+        mock_service.delete_document.return_value = True
+        mock_service_class.return_value = mock_service
+
+        response = self.client.delete("/files/file_id")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json()["message"] == "Document deleted successfully"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_delete_file_not_found(self, mock_service_class: MagicMock) -> None:
+        """Test deleting non-existent file."""
+        mock_service = MagicMock()
+        mock_service.delete_document.return_value = False
+        mock_service_class.return_value = mock_service
+
+        response = self.client.delete("/files/file_id")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json()["detail"] == "Document not found"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_delete_file_exception(self, mock_service_class: MagicMock) -> None:
+        """Test delete file with exception."""
+        mock_service = MagicMock()
+        mock_service.delete_document.side_effect = Exception("DB error")
+        mock_service_class.return_value = mock_service
+
+        response = self.client.delete("/files/file_id")
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to delete document"

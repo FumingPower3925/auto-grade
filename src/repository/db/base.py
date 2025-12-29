@@ -175,6 +175,18 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def delete_file(self, file_id: str) -> bool:
+        """Delete a file and its associated data.
+
+        Args:
+            file_id: The ID of the file to delete.
+
+        Returns:
+            True if the file was deleted, False otherwise.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def store_deliverable(
         self,
         assignment_id: str,

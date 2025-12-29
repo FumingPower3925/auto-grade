@@ -250,6 +250,45 @@ class FerretDBRepository(DatabaseRepository):
         except Exception:
             return False
 
+    def delete_file(self, file_id: str) -> bool:
+        """Delete a file and its GridFS content.
+
+        Args:
+            file_id: The ID of the file to delete.
+
+        Returns:
+            True if the file was deleted, False otherwise.
+        """
+        try:
+            obj_id = ObjectId(file_id)
+
+            # Get file to find assignment_id and gridfs_id
+            file_doc = self.files_collection.find_one({"_id": obj_id})
+            if not file_doc:
+                return False
+
+            # Delete GridFS content
+            if "gridfs_id" in file_doc:
+                self.fs.delete(file_doc["gridfs_id"])
+
+            # Remove file reference from assignment's rubrics or documents array
+            assignment_id = file_doc.get("assignment_id")
+            file_type = file_doc.get("file_type")
+
+            if assignment_id:
+                update_field = "evaluation_rubrics" if file_type == "rubric" else "relevant_documents"
+                self.assignments_collection.update_one(
+                    {"_id": assignment_id},
+                    {"$pull": {update_field: obj_id}, "$set": {"updated_at": datetime.now(UTC)}},
+                )
+
+            # Delete file document
+            result = self.files_collection.delete_one({"_id": obj_id})
+            deleted: bool = result.deleted_count > 0
+            return deleted
+        except Exception:
+            return False
+
     def store_deliverable(
         self,
         assignment_id: str,
