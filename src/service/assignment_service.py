@@ -1,8 +1,12 @@
+import asyncio
+import logging
 from typing import Any
 
 from src.repository.db.factory import get_database_repository
-from src.repository.db.models import AssignmentModel, FileModel
+from src.repository.db.models import AssignmentModel, ChunkModel, FileModel, ProcessingStatus
 from src.service.rubric_service import RubricService
+
+logger = logging.getLogger(__name__)
 
 
 class AssignmentService:
@@ -85,7 +89,7 @@ class AssignmentService:
     async def upload_relevant_document(
         self, assignment_id: str, filename: str, content: bytes, content_type: str
     ) -> str:
-        """Upload a relevant document or example for an assignment.
+        """Upload a relevant document and start background processing.
 
         Args:
             assignment_id: The ID of the assignment.
@@ -94,41 +98,101 @@ class AssignmentService:
             content_type: The MIME type of the file.
 
         Returns:
-            The ID of the uploaded file.
+            The ID of the uploaded file (processing continues in background).
         """
-        import asyncio
-
         assignment = self.db_repository.get_assignment(assignment_id)
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
 
-        # Extract text and generate embedding for vector search (run in thread pool)
-        extracted_text = None
-        embedding = None
-        try:
-            from src.service.embedding_service import EmbeddingService
-
-            embedding_service = EmbeddingService()
-            extracted_text = await asyncio.to_thread(
-                embedding_service.extract_text_from_content, content, content_type
-            )
-            if extracted_text:
-                embedding = await asyncio.to_thread(
-                    embedding_service.generate_embedding, extracted_text
-                )
-        except Exception:
-            # If embedding fails, still store the document without embedding
-            pass
-
-        return self.db_repository.store_file(
+        # Initial storage with QUEUED status
+        file_id = self.db_repository.store_file(
             assignment_id,
             filename,
             content,
             content_type,
             "relevant_document",
-            extracted_text=extracted_text,
-            embedding=embedding,
+            extracted_text=None,
+            embedding=None
         )
+
+        # Start background processing
+        asyncio.create_task(self._process_document_background(file_id, content, content_type))
+
+        return file_id
+
+    async def _process_document_background(self, file_id: str, content: bytes, content_type: str) -> None:
+        """Background task to process document: extract text, chunk, and embed."""
+        try:
+            # Update status to PROCESSING
+            self.db_repository.update_file(
+                file_id, status=ProcessingStatus.PROCESSING, progress=10.0
+            )
+
+            from src.service.embedding_service import EmbeddingService
+            embedding_service = EmbeddingService()
+
+            # 1. Extract Text
+            extracted_text = await embedding_service.extract_text_from_content(content, content_type)
+            if not extracted_text:
+                raise ValueError("Failed to extract text from document")
+
+            self.db_repository.update_file(
+                file_id,
+                extracted_text=extracted_text,
+                progress=30.0
+            )
+
+            # 2. Chunk Text
+            chunks_text = await asyncio.to_thread(embedding_service.chunk_text, extracted_text)
+            self.db_repository.update_file(file_id, chunk_count=len(chunks_text), progress=40.0)
+
+            # 3. Generate Embeddings (Parallel)
+            # a. Document level summary embedding (using truncated text)
+            doc_embedding_task = asyncio.to_thread(embedding_service.generate_embedding, extracted_text)
+
+            # b. Chunk embeddings
+            chunk_tasks = []
+            for chunk_text in chunks_text:
+                chunk_tasks.append(asyncio.to_thread(embedding_service.generate_embedding, chunk_text))
+
+            # Use gather for concurrency
+            # chunks might be many, so semaphore might be needed
+            # but for now assuming API limits handled by retry or high limit
+            logger.info(f"Generating embeddings for {len(chunk_tasks)} chunks...")
+            results = await asyncio.gather(doc_embedding_task, *chunk_tasks)
+
+            doc_embedding = results[0]
+            chunk_embeddings = results[1:]
+
+            # Construct ChunkModels
+            chunks = []
+            for i, (text, emb) in enumerate(zip(chunks_text, chunk_embeddings, strict=False)):
+                chunks.append(ChunkModel(text=text, embedding=emb, metadata={"index": i}))
+
+            # 4. Final Update
+            self.db_repository.update_file(
+                file_id,
+                embedding=doc_embedding,
+                chunks=chunks,
+                status=ProcessingStatus.COMPLETED,
+                progress=100.0,
+                error_message=None
+            )
+            logger.info(f"Document {file_id} processed successfully with {len(chunks)} chunks")
+
+        except Exception as e:
+            logger.error(f"Failed to process document {file_id}: {e}")
+            self.db_repository.update_file(
+                file_id,
+                status=ProcessingStatus.FAILED,
+                error_message=str(e),
+                progress=0.0
+            )
+
+    def get_documents_status(self, assignment_id: str) -> list[FileModel]:
+        """Get the status of all relevant documents for an assignment."""
+        return self.db_repository.list_files_by_assignment(assignment_id, "relevant_document")
+
 
     def get_file(self, file_id: str) -> FileModel | None:
         """Get a file by ID.

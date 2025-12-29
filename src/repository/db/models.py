@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any
 
 from bson import ObjectId
@@ -135,6 +136,20 @@ class ExtractedRubricModel(BaseModel):
     )
 
 
+class ProcessingStatus(str, Enum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ChunkModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(ObjectId()))
+    text: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    embedding: list[float] | None = None
+
+
 class FileModel(BaseModel):
     id: PyObjectId | ObjectId = Field(default_factory=PyObjectId, alias="_id")
     assignment_id: PyObjectId | ObjectId
@@ -144,8 +159,17 @@ class FileModel(BaseModel):
     file_type: str
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     extracted_rubric: ExtractedRubricModel | None = Field(default=None)
-    extracted_text: str | None = Field(default=None, description="Extracted text content for search")
-    embedding: list[float] | None = Field(default=None, description="Vector embedding for semantic search")
+
+    # Text Extraction & Indexing
+    extracted_text: str | None = Field(default=None, description="Full extracted text content")
+    embedding: list[float] | None = Field(default=None, description="Document-level embedding (legacy/summary)")
+
+    # Robust Pipeline Fields
+    status: ProcessingStatus = Field(default=ProcessingStatus.COMPLETED)  # Default for backward compatibility
+    progress: float = Field(default=100.0, ge=0.0, le=100.0)
+    error_message: str | None = None
+    chunk_count: int = 0
+    chunks: list[ChunkModel] = Field(default_factory=list, description="Text chunks with embeddings")
 
     @field_serializer("id", "assignment_id")
     def serialize_objectid(self, value: PyObjectId | ObjectId) -> str:

@@ -240,6 +240,10 @@ class FerretDBRepository(DatabaseRepository):
             if "extracted_rubric" in kwargs and kwargs["extracted_rubric"] is not None:
                 kwargs["extracted_rubric"] = kwargs["extracted_rubric"].model_dump()
 
+            # Handle chunks specially - convert list of models to list of dicts
+            if "chunks" in kwargs and kwargs["chunks"] is not None:
+                kwargs["chunks"] = [chunk.model_dump() for chunk in kwargs["chunks"]]
+
             result = self.files_collection.update_one({"_id": obj_id}, {"$set": kwargs})
             modified: bool = result.modified_count > 0
             return modified

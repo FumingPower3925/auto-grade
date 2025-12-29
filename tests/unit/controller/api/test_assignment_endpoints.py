@@ -196,8 +196,8 @@ class TestAssignmentEndpoints:
     @pytest.mark.parametrize(
         "side_effect,expected_status,expected_detail",
         [
-            (Exception("Upload error"), 500, "Failed to upload document"),
-            (RuntimeError("Unexpected"), 500, "Failed to upload document"),
+            (Exception("Upload error"), 500, "Failed to upload documents"),
+            (RuntimeError("Unexpected"), 500, "Failed to upload documents"),
             (ValueError("Assignment not found"), 404, "Assignment not found"),
         ],
     )
@@ -210,7 +210,8 @@ class TestAssignmentEndpoints:
         mock_service_class.return_value = mock_service
 
         response = self.client.post(
-            "/assignments/test_id/documents", files={"file": ("doc.pdf", io.BytesIO(b"content"), "application/pdf")}
+            "/assignments/test_id/documents",
+            files=[("files", ("doc.pdf", io.BytesIO(b"content"), "application/pdf"))],
         )
 
         assert response.status_code == expected_status
@@ -280,22 +281,55 @@ class TestAssignmentEndpoints:
     @patch("src.controller.api.api.AssignmentService")
     def test_upload_document_success(self, mock_service_class: MagicMock) -> None:
         """Test successful document upload."""
-        from unittest.mock import AsyncMock
-
         mock_service = MagicMock()
         mock_service.upload_relevant_document = AsyncMock(return_value="document_id")
         mock_service_class.return_value = mock_service
 
         response = self.client.post(
             "/assignments/test_id/documents",
-            files={"file": ("document.pdf", io.BytesIO(b"content"), "application/pdf")},
+            files=[("files", ("document.pdf", io.BytesIO(b"content"), "application/pdf"))],
         )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["id"] == "document_id"
-        assert data["filename"] == "document.pdf"
-        assert data["message"] == "Document uploaded successfully"
+        assert "files" in data
+        assert len(data["files"]) == 1
+        assert data["files"][0]["id"] == "document_id"
+        assert data["files"][0]["filename"] == "document.pdf"
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_get_documents_status(self, mock_service_class: MagicMock) -> None:
+        """Test getting documents status."""
+        mock_service = MagicMock()
+        mock_file = self._create_mock_file()
+        mock_file.status = MagicMock()
+        mock_file.status.value = "processing"
+        mock_file.progress = 50.0
+        mock_file.error_message = None
+        mock_file.chunk_count = 0
+
+        mock_service.get_documents_status.return_value = [mock_file]
+        mock_service_class.return_value = mock_service
+
+        response = self.client.get("/assignments/test_id/documents/status")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["status"] == "processing"
+        assert data[0]["progress"] == 50.0
+
+    @patch("src.controller.api.api.AssignmentService")
+    def test_get_documents_status_exception(self, mock_service_class: MagicMock) -> None:
+        """Test getting documents status with exception."""
+        mock_service = MagicMock()
+        mock_service.get_documents_status.side_effect = Exception("DB error")
+        mock_service_class.return_value = mock_service
+
+        response = self.client.get("/assignments/test_id/documents/status")
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["detail"] == "Failed to get documents status"
 
     def _create_mock_assignment(self, name: str = "Test Assignment") -> AssignmentModel:
         """Create a mock AssignmentModel."""

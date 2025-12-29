@@ -74,10 +74,10 @@ class TestAssignmentWorkflow:
         doc_content = b"Test document content"
         response = self.client.post(
             f"/assignments/{assignment_id}/documents",
-            files={"file": ("doc.txt", io.BytesIO(doc_content), "text/plain")},
+            files=[("files", ("doc.txt", io.BytesIO(doc_content), "text/plain"))],
         )
         assert response.status_code == status.HTTP_200_OK
-        doc_id = response.json()["id"]
+        doc_id = response.json()["files"][0]["id"]
 
         response = self.client.get(f"/assignments/{assignment_id}")
         assert response.status_code == status.HTTP_200_OK

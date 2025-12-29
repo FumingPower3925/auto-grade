@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from bson import ObjectId
 
-from src.repository.db.models import AssignmentModel, ExtractedRubricModel, FileModel
+from src.repository.db.models import AssignmentModel, ExtractedRubricModel, FileModel, ProcessingStatus
 from src.service.assignment_service import AssignmentService
 
 
@@ -178,6 +178,88 @@ class TestAssignmentService:
         with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
             await service.upload_relevant_document("test_id", "doc.pdf", b"content", "application/pdf")
 
+
+    @pytest.mark.asyncio
+    @patch("src.service.assignment_service.get_database_repository")
+    async def test_process_document_background_success(self, mock_get_repo: MagicMock) -> None:
+        """Test the background processing of a document."""
+        mock_repo = MagicMock()
+        mock_get_repo.return_value = mock_repo
+        service = AssignmentService()
+
+        file_id = "file123"
+        content = b"Mock PDF Content"
+        content_type = "application/pdf"
+
+        # Mock embedding service
+        with patch("src.service.embedding_service.EmbeddingService") as MockEmbeddingService:
+            mock_embedding_service = MockEmbeddingService.return_value
+            # Mock extract_text
+            mock_embedding_service.extract_text_from_content = AsyncMock(return_value="Extracted text content")
+            # Mock chunk_text (run in thread)
+            mock_embedding_service.chunk_text.return_value = ["chunk1", "chunk2"]
+            # Mock generate_embedding
+            mock_embedding_service.generate_embedding.return_value = [0.1, 0.2, 0.3]
+
+            await service._process_document_background(file_id, content, content_type)
+
+            # Verifications
+            # 1. Update status to PROCESSING
+            mock_repo.update_file.assert_any_call(
+                file_id, status=ProcessingStatus.PROCESSING, progress=10.0
+            )
+
+            # 2. Extract text called
+            mock_embedding_service.extract_text_from_content.assert_called_with(content, content_type)
+            # Update with extracted text
+            mock_repo.update_file.assert_any_call(
+                file_id, extracted_text="Extracted text content", progress=30.0
+            )
+
+            # 3. Chunk text called
+            mock_embedding_service.chunk_text.assert_called_with("Extracted text content")
+
+            # 4. Generate embeddings called
+            # Once for document summary, twice for chunks -> total 3 calls
+            assert mock_embedding_service.generate_embedding.call_count >= 3
+
+            # 5. Final completion update
+            # Check the call arguments for the final update
+            call_args_list = mock_repo.update_file.call_args_list
+            final_call = call_args_list[-1]
+            kwargs = final_call.kwargs
+            assert kwargs["status"] == ProcessingStatus.COMPLETED
+            assert kwargs["progress"] == 100.0
+            assert "chunks" in kwargs
+            assert len(kwargs["chunks"]) == 2
+
+    @pytest.mark.asyncio
+    @patch("src.service.assignment_service.get_database_repository")
+    async def test_process_document_background_failure_extraction(self, mock_get_repo: MagicMock) -> None:
+        """Test failure during extraction in background processing."""
+        mock_repo = MagicMock()
+        mock_get_repo.return_value = mock_repo
+        service = AssignmentService()
+
+        file_id = "file123"
+        content = b"Bad Content"
+        content_type = "application/pdf"
+
+        with patch("src.service.embedding_service.EmbeddingService") as MockEmbeddingService:
+            mock_embedding_service = MockEmbeddingService.return_value
+            # Return empty text to trigger ValueError
+            mock_embedding_service.extract_text_from_content = AsyncMock(return_value="")
+
+            await service._process_document_background(file_id, content, content_type)
+
+            # Verify failure update
+            mock_repo.update_file.assert_called_with(
+                file_id,
+                status=ProcessingStatus.FAILED,
+                error_message="Failed to extract text from document",
+                progress=0.0
+            )
+
     @patch("src.service.assignment_service.get_database_repository")
     def test_get_file(self, mock_get_repo: MagicMock) -> None:
         """Test getting a file."""
@@ -294,6 +376,20 @@ class TestAssignmentService:
 
         assert result is True
         mock_repo.create_vector_index.assert_called_once_with(1536)
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_get_documents_status(self, mock_get_repo: MagicMock) -> None:
+        """Test getting documents status."""
+        mock_repo = MagicMock()
+        mock_files = [self._create_mock_file("doc1.pdf")]
+        mock_repo.list_files_by_assignment.return_value = mock_files
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        result = service.get_documents_status("assignment_id")
+
+        assert result == mock_files
+        mock_repo.list_files_by_assignment.assert_called_once_with("assignment_id", "relevant_document")
 
     def _create_mock_assignment(self, name: str = "Test Assignment") -> AssignmentModel:
         """Create a mock AssignmentModel."""

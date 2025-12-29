@@ -23,6 +23,8 @@ class EmbeddingConfig(BaseModel):
     provider: str = "openai"
     model: str = "text-embedding-3-small"
     dimensions: int = 1536
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
 
 
 class DatabaseConfig(BaseModel):

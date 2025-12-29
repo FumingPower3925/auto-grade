@@ -10,6 +10,7 @@ from src.controller.api.models import (
     AssignmentListResponse,
     AssignmentResponse,
     BulkDeliverableUploadResponse,
+    BulkFileUploadResponse,
     CreateAssignmentRequest,
     DeleteResponse,
     DeliverableListResponse,
@@ -171,6 +172,10 @@ async def get_assignment(assignment_id: str) -> AssignmentDetailResponse:
                 content_type=doc.content_type,
                 file_type=doc.file_type,
                 uploaded_at=doc.uploaded_at.isoformat(),
+                status=str(doc.status.value) if hasattr(doc, "status") and doc.status else None,
+                progress=doc.progress,
+                error_message=doc.error_message,
+                chunk_count=doc.chunk_count,
             )
             for doc in documents
         ]
@@ -233,30 +238,66 @@ async def upload_rubric(assignment_id: str, file: Annotated[UploadFile, File(...
         raise HTTPException(status_code=500, detail="Failed to upload rubric") from e
 
 
-@app.post("/assignments/{assignment_id}/documents", response_model=FileUploadResponse, tags=["Assignments"])
-async def upload_relevant_document(assignment_id: str, file: Annotated[UploadFile, File(...)]) -> FileUploadResponse:
-    """Upload a relevant document or example for an assignment."""
+@app.post("/assignments/{assignment_id}/documents", response_model=BulkFileUploadResponse, tags=["Assignments"])
+async def upload_relevant_documents(
+    assignment_id: str, files: Annotated[list[UploadFile], File(...)]
+) -> BulkFileUploadResponse:
+    """Upload multiple relevant documents for an assignment (async processing)."""
     assignment_service = AssignmentService()
 
     try:
-        content = await file.read()
-        file_id = await assignment_service.upload_relevant_document(
-            assignment_id=assignment_id,
-            filename=file.filename or "document",
-            content=content,
-            content_type=file.content_type or DEFAULT_CONTENT_TYPE,
-        )
+        uploaded_files = []
+        for file in files:
+            content = await file.read()
+            # This returns immediately after queuing background task
+            file_id = await assignment_service.upload_relevant_document(
+                assignment_id=assignment_id,
+                filename=file.filename or "document",
+                content=content,
+                content_type=file.content_type or DEFAULT_CONTENT_TYPE,
+            )
+            uploaded_files.append(
+                FileUploadResponse(
+                    id=file_id,
+                    filename=file.filename or "document",
+                    uploaded_at=datetime.datetime.now(datetime.UTC).isoformat(),
+                    message="Document queued for processing",
+                )
+            )
 
-        return FileUploadResponse(
-            id=file_id,
-            filename=file.filename or "document",
-            uploaded_at=datetime.datetime.now(datetime.UTC).isoformat(),
-            message="Document uploaded successfully",
+        return BulkFileUploadResponse(
+            files=uploaded_files,
+            total_uploaded=len(uploaded_files),
+            message=f"Successfully queued {len(uploaded_files)} document(s) for processing",
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to upload document") from e
+        raise HTTPException(status_code=500, detail="Failed to upload documents") from e
+
+
+@app.get("/assignments/{assignment_id}/documents/status", response_model=list[FileInfo], tags=["Assignments"])
+async def get_documents_status(assignment_id: str) -> list[FileInfo]:
+    """Get processing status of relevant documents."""
+    assignment_service = AssignmentService()
+    try:
+        documents = assignment_service.get_documents_status(assignment_id)
+        return [
+            FileInfo(
+                id=str(doc.id),
+                filename=doc.filename,
+                content_type=doc.content_type,
+                file_type=doc.file_type,
+                uploaded_at=doc.uploaded_at.isoformat(),
+                status=str(doc.status.value) if hasattr(doc, "status") and doc.status else None,
+                progress=doc.progress,
+                error_message=doc.error_message,
+                chunk_count=doc.chunk_count,
+            )
+            for doc in documents
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to get documents status") from e
 
 
 @app.get("/files/{file_id}", tags=["Files"])

@@ -1,7 +1,7 @@
 """Tests for EmbeddingService."""
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -124,7 +124,8 @@ class TestEmbeddingService:
                     with pytest.raises(Exception, match="API error"):
                         service.generate_embedding("test text")
 
-    def test_extract_text_from_pdf_success(self) -> None:
+    @pytest.mark.asyncio
+    async def test_extract_text_from_pdf_success(self) -> None:
         """Test PDF text extraction."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -133,18 +134,25 @@ class TestEmbeddingService:
 
                     service = embedding_service.EmbeddingService()
 
-                    with patch("pypdf.PdfReader") as mock_reader_class:
+                    with patch("pypdf.PdfReader") as mock_reader_class, \
+                         patch("pypdf.PdfWriter") as mock_writer_class:  # Mock PdfWriter too
                         mock_page = MagicMock()
-                        mock_page.extract_text.return_value = "page content"
+                        mock_page.extract_text.return_value = "page content " * 5  # > 50 chars to avoid OCR
+                        mock_page.mediabox.width = 50
+                        mock_page.mediabox.height = 50
                         mock_reader = MagicMock()
                         mock_reader.pages = [mock_page]
                         mock_reader_class.return_value = mock_reader
 
-                        text = service._extract_text_from_pdf(b"pdf content")
+                        mock_writer = MagicMock()
+                        mock_writer_class.return_value = mock_writer
 
-                    assert text == "page content"
+                        text = await service._extract_text_from_pdf_robust(b"pdf content")
 
-    def test_extract_text_from_pdf_multiple_pages(self) -> None:
+                    assert text == "page content " * 5
+
+    @pytest.mark.asyncio
+    async def test_extract_text_from_pdf_multiple_pages(self) -> None:
         """Test PDF text extraction with multiple pages."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -153,20 +161,29 @@ class TestEmbeddingService:
 
                     service = embedding_service.EmbeddingService()
 
-                    with patch("pypdf.PdfReader") as mock_reader_class:
+                    with patch("pypdf.PdfReader") as mock_reader_class, \
+                         patch("pypdf.PdfWriter") as mock_writer_class:
                         mock_page1 = MagicMock()
-                        mock_page1.extract_text.return_value = "page 1"
+                        mock_page1.extract_text.return_value = "page 1 " * 10
+                        mock_page1.mediabox.width = 50
+                        mock_page1.mediabox.height = 50
                         mock_page2 = MagicMock()
-                        mock_page2.extract_text.return_value = "page 2"
+                        mock_page2.extract_text.return_value = "page 2 " * 10
+                        mock_page2.mediabox.width = 50
+                        mock_page2.mediabox.height = 50
                         mock_reader = MagicMock()
                         mock_reader.pages = [mock_page1, mock_page2]
                         mock_reader_class.return_value = mock_reader
 
-                        text = service._extract_text_from_pdf(b"pdf content")
+                        mock_writer = MagicMock()
+                        mock_writer_class.return_value = mock_writer
 
-                    assert text == "page 1\npage 2"
+                        text = await service._extract_text_from_pdf_robust(b"pdf content")
 
-    def test_extract_text_from_pdf_empty_page(self) -> None:
+                    assert text == ("page 1 " * 10) + "\n\n" + ("page 2 " * 10)
+
+    @pytest.mark.asyncio
+    async def test_extract_text_from_pdf_empty_page(self) -> None:
         """Test PDF text extraction with empty pages."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -178,15 +195,18 @@ class TestEmbeddingService:
                     with patch("pypdf.PdfReader") as mock_reader_class:
                         mock_page = MagicMock()
                         mock_page.extract_text.return_value = None
+                        mock_page.mediabox.width = 500
+                        mock_page.mediabox.height = 800
                         mock_reader = MagicMock()
                         mock_reader.pages = [mock_page]
                         mock_reader_class.return_value = mock_reader
 
-                        text = service._extract_text_from_pdf(b"pdf content")
+                        text = await service._extract_text_from_pdf_robust(b"pdf content")
 
                     assert text == ""
 
-    def test_extract_text_from_pdf_error(self) -> None:
+    @pytest.mark.asyncio
+    async def test_extract_text_from_pdf_error(self) -> None:
         """Test PDF text extraction handles errors."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -194,11 +214,12 @@ class TestEmbeddingService:
                     mock_get_config.return_value = self._create_mock_config()
 
                     service = embedding_service.EmbeddingService()
-                    text = service._extract_text_from_pdf(b"not a pdf")
+                    text = await service._extract_text_from_pdf_robust(b"not a pdf")
 
                     assert text == ""
 
-    def test_extract_text_from_content_pdf(self) -> None:
+    @pytest.mark.asyncio
+    async def test_extract_text_from_content_pdf(self) -> None:
         """Test content extraction for PDF."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -207,12 +228,13 @@ class TestEmbeddingService:
 
                     service = embedding_service.EmbeddingService()
 
-                    with patch.object(service, "_extract_text_from_pdf", return_value="pdf text"):
-                        text = service.extract_text_from_content(b"pdf content", "application/pdf")
+                    with patch.object(service, "_extract_text_from_pdf_robust", return_value="pdf text"):
+                        text = await service.extract_text_from_content(b"pdf content", "application/pdf")
 
                     assert text == "pdf text"
 
-    def test_extract_text_from_content_text_plain(self) -> None:
+    @pytest.mark.asyncio
+    async def test_extract_text_from_content_text_plain(self) -> None:
         """Test content extraction for text/plain files."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -220,11 +242,12 @@ class TestEmbeddingService:
                     mock_get_config.return_value = self._create_mock_config()
 
                     service = embedding_service.EmbeddingService()
-                    text = service.extract_text_from_content(b"plain text content", "text/plain")
+                    text = await service.extract_text_from_content(b"plain text content", "text/plain")
 
                     assert text == "plain text content"
 
-    def test_extract_text_from_content_text_html(self) -> None:
+    @pytest.mark.asyncio
+    async def test_extract_text_from_content_text_html(self) -> None:
         """Test content extraction for text/html files."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -232,11 +255,12 @@ class TestEmbeddingService:
                     mock_get_config.return_value = self._create_mock_config()
 
                     service = embedding_service.EmbeddingService()
-                    text = service.extract_text_from_content(b"<html>content</html>", "text/html")
+                    text = await service.extract_text_from_content(b"<html>content</html>", "text/html")
 
                     assert text == "<html>content</html>"
 
-    def test_extract_text_from_content_unsupported(self) -> None:
+    @pytest.mark.asyncio
+    async def test_extract_text_from_content_unsupported(self) -> None:
         """Test content extraction for unsupported types."""
         with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
             with patch.object(embedding_service, "OpenAI"):
@@ -244,6 +268,87 @@ class TestEmbeddingService:
                     mock_get_config.return_value = self._create_mock_config()
 
                     service = embedding_service.EmbeddingService()
-                    text = service.extract_text_from_content(b"image data", "image/png")
+                    text = await service.extract_text_from_content(b"image data", "image/png")
 
                     assert text == ""
+
+    @pytest.mark.asyncio
+    async def test_extract_text_from_pdf_low_density_triggers_ocr(self) -> None:
+        """Test that low density text triggers OCR."""
+        with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
+            with patch.object(embedding_service, "OpenAI"):
+                with patch.object(embedding_service, "get_config") as mock_get_config:
+                    mock_get_config.return_value = self._create_mock_config()
+
+                    service = embedding_service.EmbeddingService()
+                    service.ocr_service.extract_text_from_pdf = AsyncMock(return_value="OCR Text")
+
+                    with patch("pypdf.PdfReader") as mock_reader_class, \
+                         patch("pypdf.PdfWriter") as mock_writer_class:
+
+                        mock_page = MagicMock()
+                        # Short text with large area -> Low density
+                        mock_page.extract_text.return_value = "Short text"
+                        mock_page.mediabox.width = 1000
+                        mock_page.mediabox.height = 1000
+
+                        mock_reader = MagicMock()
+                        mock_reader.pages = [mock_page]
+                        mock_reader_class.return_value = mock_reader
+
+                        mock_writer = MagicMock()
+                        mock_writer_class.return_value = mock_writer
+
+                        text = await service._extract_text_from_pdf_robust(b"pdf content")
+
+                    # Should have triggered OCR
+                    service.ocr_service.extract_text_from_pdf.assert_called_once()
+                    assert text == "OCR Text"
+
+    @pytest.mark.asyncio
+    async def test_extract_text_from_pdf_ocr_failure(self) -> None:
+        """Test OCR failure handling (returns empty string for that page)."""
+        with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
+            with patch.object(embedding_service, "OpenAI"):
+                with patch.object(embedding_service, "get_config") as mock_get_config:
+                    mock_get_config.return_value = self._create_mock_config()
+
+                    service = embedding_service.EmbeddingService()
+                    # OCR returns None or raises? Code handles `if result: ... else: warning`.
+                    # Mock return value as None (failed/empty)
+                    service.ocr_service.extract_text_from_pdf = AsyncMock(return_value=None)
+
+                    with patch("pypdf.PdfReader") as mock_reader_class, \
+                         patch("pypdf.PdfWriter") as mock_writer_class:
+
+                        mock_page = MagicMock()
+                        mock_page.extract_text.return_value = " " # Empty/Low density
+                        mock_page.mediabox.width = 1000
+                        mock_page.mediabox.height = 1000
+
+                        mock_reader = MagicMock()
+                        mock_reader.pages = [mock_page]
+                        mock_reader_class.return_value = mock_reader
+                        mock_writer_class.return_value = MagicMock()
+
+                        text = await service._extract_text_from_pdf_robust(b"pdf content")
+
+                    assert text == ""
+
+    def test_chunk_text(self) -> None:
+        """Test chunk_text wrapper."""
+        with patch.dict(os.environ, {"EMBEDDING_API_KEY": "test-key"}):
+            with patch.object(embedding_service, "OpenAI"):
+                with patch.object(embedding_service, "get_config") as mock_get_config:
+                    mock_get_config.return_value = self._create_mock_config()
+
+                    service = embedding_service.EmbeddingService()
+
+                    # Test empty
+                    assert service.chunk_text("") == []
+                    assert service.chunk_text(None) == []
+
+                    # Test with text (delegates to splitter)
+                    service.text_splitter.split_text = MagicMock(return_value=["chunk1", "chunk2"])
+                    assert service.chunk_text("some text") == ["chunk1", "chunk2"]
+                    service.text_splitter.split_text.assert_called_with("some text")
