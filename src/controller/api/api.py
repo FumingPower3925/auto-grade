@@ -247,7 +247,7 @@ async def upload_relevant_documents(
         for file in files:
             content = await file.read()
             # This returns immediately after queuing background task
-            file_id = await assignment_service.upload_relevant_document(
+            file_id = assignment_service.upload_relevant_document(
                 assignment_id=assignment_id,
                 filename=file.filename or "document",
                 content=content,

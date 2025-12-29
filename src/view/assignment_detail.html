@@ -439,12 +439,9 @@
             document.body.classList.remove('modal-open');
         }
 
-        document.getElementById('uploadForm').addEventListener('submit', async function (e) {
-            e.preventDefault();
-
+        // Helper functions for upload form
+        function prepareFormData(fileInput) {
             const formData = new FormData();
-            const fileInput = document.getElementById('fileInput');
-
             if (currentUploadType === 'document' && fileInput.files.length > 0) {
                 for (const file of fileInput.files) {
                     formData.append('files', file);
@@ -452,60 +449,75 @@
             } else {
                 formData.append('file', fileInput.files[0]);
             }
+            return formData;
+        }
 
-            const endpoint = currentUploadType === 'rubric'
+        function getUploadEndpoint() {
+            return currentUploadType === 'rubric'
                 ? `/api/assignments/${assignmentId}/rubrics`
                 : `/api/assignments/${assignmentId}/documents`;
+        }
 
-            // Show processing overlay for rubric uploads
+        function showPreUploadUI() {
+            hideUploadModal();
             if (currentUploadType === 'rubric') {
-                hideUploadModal();
-                // Re-add modal-open class to keep body scroll disabled during processing
                 document.body.classList.add('modal-open');
                 document.getElementById('uploadProcessingOverlay').classList.add('active');
             } else {
-                hideUploadModal();
                 showProcessingModal('uploading');
             }
+        }
+
+        function hideProcessingUI() {
+            document.getElementById('uploadProcessingOverlay').classList.remove('active');
+            if (currentUploadType === 'rubric') {
+                document.body.classList.remove('modal-open');
+            }
+        }
+
+        function handleUploadSuccess() {
+            if (currentUploadType === 'rubric') {
+                globalThis.location.reload();
+            } else {
+                showProcessingModal('processing');
+                startProcessingPolling();
+            }
+        }
+
+        function handleUploadError(error) {
+            if (currentUploadType === 'document') {
+                document.getElementById('processingStatusText').textContent = 'Upload Failed';
+                document.getElementById('processingSpinner').style.display = 'none';
+                document.getElementById('processingCloseBtn').disabled = false;
+            }
+            alert('Error uploading file: ' + (error.detail || error.message || 'Unknown error'));
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            const formData = prepareFormData(fileInput);
+            const endpoint = getUploadEndpoint();
+
+            showPreUploadUI();
 
             try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                // Hide processing overlay for rubrics
-                document.getElementById('uploadProcessingOverlay').classList.remove('active');
-                if (currentUploadType === 'rubric') {
-                    document.body.classList.remove('modal-open');
-                }
+                const response = await fetch(endpoint, { method: 'POST', body: formData });
+                hideProcessingUI();
 
                 if (response.ok) {
-                    if (currentUploadType === 'rubric') {
-                        globalThis.location.reload();
-                    } else {
-                        // For documents, start polling
-                        showProcessingModal('processing');
-                        startProcessingPolling();
-                    }
+                    handleUploadSuccess();
                 } else {
-                    if (currentUploadType === 'document') {
-                        document.getElementById('processingStatusText').textContent = 'Upload Failed';
-                        document.getElementById('processingSpinner').style.display = 'none';
-                        document.getElementById('processingCloseBtn').disabled = false;
-                    }
                     const error = await response.json();
-                    alert('Error uploading file: ' + (error.detail || 'Unknown error'));
+                    handleUploadError(error);
                 }
             } catch (error) {
-                document.getElementById('uploadProcessingOverlay').classList.remove('active');
-                if (currentUploadType === 'rubric') {
-                    document.body.classList.remove('modal-open');
-                }
+                hideProcessingUI();
                 if (currentUploadType === 'document') {
                     closeProcessingModal();
                 }
-                alert('Error uploading file: ' + error.message);
+                handleUploadError(error);
             }
         });
 

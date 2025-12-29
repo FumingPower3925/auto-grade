@@ -155,7 +155,7 @@ class TestAssignmentService:
             mock_embedding_instance.generate_embedding.return_value = [0.1] * 1536
             mock_embedding.return_value = mock_embedding_instance
 
-            file_id = await service.upload_relevant_document(
+            file_id = service.upload_relevant_document(
                 "assignment_id",
                 "example.docx",
                 b"content",
@@ -176,7 +176,7 @@ class TestAssignmentService:
         service = AssignmentService()
 
         with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
-            await service.upload_relevant_document("test_id", "doc.pdf", b"content", "application/pdf")
+            service.upload_relevant_document("test_id", "doc.pdf", b"content", "application/pdf")
 
     @pytest.mark.asyncio
     @patch("src.service.assignment_service.get_database_repository")
@@ -318,7 +318,7 @@ class TestAssignmentService:
         with patch("src.service.embedding_service.EmbeddingService") as mock_embedding:
             mock_embedding.side_effect = Exception("API key missing")
 
-            file_id = await service.upload_relevant_document(
+            file_id = service.upload_relevant_document(
                 "assignment_id",
                 "example.docx",
                 b"content",

@@ -282,7 +282,7 @@ class TestAssignmentEndpoints:
     def test_upload_document_success(self, mock_service_class: MagicMock) -> None:
         """Test successful document upload."""
         mock_service = MagicMock()
-        mock_service.upload_relevant_document = AsyncMock(return_value="document_id")
+        mock_service.upload_relevant_document.return_value = "document_id"
         mock_service_class.return_value = mock_service
 
         response = self.client.post(
