@@ -94,6 +94,19 @@ body {
     font-size: 12px;
 }
 
+.btn-icon-only {
+    padding: 4px 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon-only svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
+
 .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -308,16 +321,30 @@ body {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    /* Flex centering */
+    align-items: center;
+    justify-content: center;
+}
+
+/* Disable body scroll when modal is open */
+body.modal-open {
+    overflow: hidden;
 }
 
 .modal-content {
     background-color: #fff;
-    margin: 10% auto;
+    margin: 0;
+    /* Remove margin as flex handles centering */
     padding: 0;
     border-radius: 8px;
     width: 80%;
     max-width: 500px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    max-height: 90vh;
+    /* Ensure it fits vertically */
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-small {
@@ -328,13 +355,35 @@ body {
     max-width: 700px;
     max-height: 70vh;
     overflow: hidden;
+    position: relative;
+    padding-bottom: 15px;
+    transition: max-width 0.3s ease, max-height 0.3s ease;
+}
+
+.modal-large.modal-expanded {
+    max-width: 95vw;
+    max-height: 90vh;
 }
 
 .modal-large .modal-content {
-    max-height: 70vh;
+    max-height: 85vh;
     display: flex;
     flex-direction: column;
-    margin: 15vh auto;
+    margin: 0;
+}
+
+.modal-large.modal-expanded .modal-content {
+    max-height: 95vh;
+    height: 95vh;
+    width: 95vw;
+    margin: 0;
+}
+
+.modal-large.modal-expanded .modal-body {
+    max-height: none;
+    /* Let flex handle it */
+    flex: 1;
+    overflow-y: auto;
 }
 
 .modal-header {
@@ -345,11 +394,22 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 10;
 }
 
 .modal-header h2 {
     margin: 0;
     font-size: 20px;
+}
+
+.modal-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .modal-body {
@@ -365,36 +425,43 @@ body {
 }
 
 .modal-footer {
-    padding: 20px;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    padding: 20px 25px;
     border-top: 1px solid #e9ecef;
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 12px;
 }
 
 .modal-large .modal-footer {
     flex-shrink: 0;
     border-top: 1px solid #e9ecef;
-    padding: 20px;
+    padding: 20px 25px;
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 12px;
     background-color: #fff;
 }
 
 .close {
-    color: #aaa;
-    font-size: 28px;
-    font-weight: bold;
+    background: none;
+    border: none;
+    padding: 4px;
     cursor: pointer;
-    line-height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.close:hover,
-.close:focus {
-    color: #000;
+.close svg {
+    width: 20px;
+    height: 20px;
+    stroke: #6c757d;
+    transition: stroke 0.2s ease;
+}
+
+.close:hover svg,
+.close:focus svg {
+    stroke: #1a1a2e;
 }
 
 .form-group {
@@ -415,6 +482,13 @@ body {
     border-radius: 4px;
     font-size: 14px;
     box-sizing: border-box;
+}
+
+.readonly-input {
+    background-color: #e9ecef;
+    cursor: default;
+    color: #495057;
+    font-weight: 600;
 }
 
 .form-group input:focus {
@@ -705,5 +779,453 @@ body {
 
     .deliverables-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Rubric Item Styles */
+.rubric-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.rubric-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.rubric-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.criteria-badge {
+    background: linear-gradient(135deg, #4a5fc1 0%, #5e3d8a 100%);
+    color: white;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Rubric Modal Styles */
+.rubric-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.criteria-section {
+    margin-top: 20px;
+}
+
+.criteria-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.criteria-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.criteria-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.no-criteria {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+/* NOTE: Base .criterion-item, .criterion-header, .criterion-number, .criterion-fields styles defined below in Collapsible Criterion section */
+
+@media (max-width: 768px) {
+    .rubric-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .rubric-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .rubric-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+/* Button Icon Styles */
+.btn-icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+.btn-small .btn-icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* Modal Body additional padding - merged with .modal-body above */
+/* padding: 25px 30px; is handled via .modal-large .modal-body or inline */
+
+/* Loading Overlay */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    border-radius: 12px;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #e9ecef;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-text {
+    margin-top: 15px;
+    color: #555;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Disabled Form State */
+.rubric-form-disabled {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* Styled Close Button */
+.modal-header .close {
+    background: none;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #666;
+    font-size: 20px;
+    transition: all 0.2s ease;
+}
+
+.modal-header .close:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.modal-header .close svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Collapsible Criterion Item */
+.criterion-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.criterion-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.criterion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%);
+    border-bottom: none;
+    transition: background 0.2s ease;
+}
+
+.criterion-item.expanded .criterion-header {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.criterion-header:hover {
+    background: linear-gradient(135deg, #f0f2f5 0%, #e9ecef 100%);
+}
+
+.criterion-summary {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+}
+
+.criterion-number {
+    font-weight: 700;
+    color: #667eea;
+    font-size: 13px;
+    min-width: 25px;
+}
+
+.criterion-title-preview {
+    font-weight: 500;
+    color: #333;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.criterion-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+.criterion-meta span {
+    background: #e9ecef;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.criterion-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.criterion-expand-icon {
+    width: 20px;
+    height: 20px;
+    color: #999;
+    transition: transform 0.2s ease;
+}
+
+.criterion-item.expanded .criterion-expand-icon {
+    transform: rotate(180deg);
+}
+
+.criterion-fields {
+    padding: 10px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    background: #fff;
+}
+
+.criterion-item.expanded .criterion-fields {
+    display: flex;
+}
+
+.criterion-fields .form-group {
+    margin-bottom: 0;
+}
+
+.criterion-fields label {
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.criterion-fields input,
+.criterion-fields textarea {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.criterion-fields input:focus,
+.criterion-fields textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+}
+
+/* Grades Section */
+.grades-section {
+    margin-top: 15px;
+    border-top: 1px solid #e9ecef;
+    padding-top: 15px;
+}
+
+.grades-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.grades-header label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.grades-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 10px;
+}
+
+.grade-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 10px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease;
+}
+
+.grade-item:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+}
+
+.grade-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.grade-label {
+    flex: 2;
+    font-weight: 500;
+}
+
+.grade-points {
+    width: 70px !important;
+    flex: 0 0 70px;
+    text-align: center;
+}
+
+.grade-description {
+    width: 100%;
+    resize: vertical;
+    min-height: 40px;
+    font-size: 12px;
+    line-height: 1.3;
+    padding: 6px 8px;
+}
+
+.grades-count {
+    background: #4a5fc1 !important;
+    color: white !important;
+}
+
+.no-grades {
+    color: #999;
+    font-style: italic;
+    padding: 10px;
+    text-align: center;
+}
+
+/* Upload Processing Overlay */
+.upload-processing-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.upload-processing-overlay.active {
+    display: flex;
+}
+
+.upload-processing-content {
+    background: white;
+    padding: 40px 50px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.upload-processing-content .loading-spinner {
+    margin: 0 auto 20px;
+}
+
+.upload-processing-content h3 {
+    margin: 0 0 10px;
+    color: #333;
+}
+
+.upload-processing-content p {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .criterion-summary {
+        flex-wrap: wrap;
+    }
+
+    .criterion-title-preview {
+        max-width: 100%;
     }
 }

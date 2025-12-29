@@ -524,3 +524,55 @@ class TestAssignmentOperations:
             "file_type": "rubric",
             "uploaded_at": datetime.now(UTC),
         }
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_update_file_success(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test successful file update."""
+        from src.repository.db.models import ExtractedRubricModel
+
+        mock_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_update_result = MagicMock()
+        mock_update_result.modified_count = 1
+        mock_collection.update_one.return_value = mock_update_result
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_collection
+
+        extracted = ExtractedRubricModel(title="Test", total_points=100, criteria=[])
+        result = repo.update_file("60c72b2f9b1d8e2a1c9d4b7f", extracted_rubric=extracted)
+
+        assert result is True
+        call_args = mock_collection.update_one.call_args
+        assert "extracted_rubric" in call_args[0][1]["$set"]
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_update_file_no_modification(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test update_file when no modification made."""
+        mock_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_update_result = MagicMock()
+        mock_update_result.modified_count = 0
+        mock_collection.update_one.return_value = mock_update_result
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_collection
+
+        result = repo.update_file("60c72b2f9b1d8e2a1c9d4b7f", title="New Title")
+
+        assert result is False
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_update_file_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test update_file with exception."""
+        mock_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_collection.update_one.side_effect = Exception("DB error")
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_collection
+
+        result = repo.update_file("60c72b2f9b1d8e2a1c9d4b7f", title="New Title")
+
+        assert result is False
+

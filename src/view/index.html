@@ -37,7 +37,11 @@
             <div class="modal-header">
                 <h2>Create New Assignment</h2>
                 <button type="button" class="close" aria-label="Close" onclick="hideCreateAssignmentModal()">
-                    <span aria-hidden="true">&times;</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
             </div>
             <form id="createAssignmentForm">
@@ -86,12 +90,14 @@
 
     <script>
         function showCreateAssignmentModal() {
-            document.getElementById('createAssignmentModal').style.display = 'block';
+            document.getElementById('createAssignmentModal').style.display = 'flex';
+            document.body.classList.add('modal-open');
         }
 
         function hideCreateAssignmentModal() {
             document.getElementById('createAssignmentModal').style.display = 'none';
             document.getElementById('createAssignmentForm').reset();
+            document.body.classList.remove('modal-open');
         }
 
         function showDeleteConfirmModal(assignmentId) {
@@ -102,11 +108,13 @@
                 deleteAssignment(assignmentId);
             };
 
-            modal.style.display = 'block';
+            modal.style.display = 'flex';
+            document.body.classList.add('modal-open');
         }
 
         function hideDeleteConfirmModal() {
             document.getElementById('deleteConfirmModal').style.display = 'none';
+            document.body.classList.remove('modal-open');
         }
 
         document.getElementById('createAssignmentForm').addEventListener('submit', async function (e) {

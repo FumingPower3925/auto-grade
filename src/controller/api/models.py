@@ -43,13 +43,21 @@ class FileInfo(BaseModel):
     extracted_rubric: "ExtractedRubricResponse | None" = None
 
 
+class GradeLevelResponse(BaseModel):
+    """API response model for a performance level."""
+
+    label: str
+    points: float
+    description: str
+
+
 class RubricCriterionResponse(BaseModel):
     """API response model for a rubric criterion."""
 
     name: str
-    description: str
     max_points: float
     weight: float | None
+    grades: list[GradeLevelResponse]
 
 
 class ExtractedRubricResponse(BaseModel):
@@ -59,6 +67,31 @@ class ExtractedRubricResponse(BaseModel):
     total_points: float | None
     criteria: list[RubricCriterionResponse]
     raw_text: str | None
+
+
+class GradeLevelInput(BaseModel):
+    """API input model for a performance level."""
+
+    label: str = Field(..., max_length=100)
+    points: float = Field(..., ge=0.0)
+    description: str = Field(default="")
+
+
+class RubricCriterionInput(BaseModel):
+    """API input model for a rubric criterion."""
+
+    name: str = Field(..., max_length=255)
+    max_points: float = Field(..., ge=0.0)
+    weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    grades: list[GradeLevelInput] = Field(default_factory=list)
+
+
+class UpdateRubricRequest(BaseModel):
+    """Request model for updating a rubric's extracted data."""
+
+    title: str | None = Field(None, max_length=255, description="Rubric title")
+    total_points: float | None = Field(None, ge=0.0, description="Total points")
+    criteria: list[RubricCriterionInput] | None = Field(None, description="List of grading criteria")
 
 
 class AssignmentDetailResponse(BaseModel):

@@ -1,0 +1,115 @@
+<!-- Deliverable Upload Modal -->
+<div id="deliverableUploadModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Upload Student Deliverables</h2>
+            <button type="button" class="close" aria-label="Close" onclick="hideDeliverableUploadModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+                <p>Drag and drop PDF files here or click to browse</p>
+                <input type="file" id="deliverableFileInput" multiple accept=".pdf" style="display: none;">
+                <button class="btn btn-primary" onclick="document.getElementById('deliverableFileInput').click()">
+                    Select Files
+                </button>
+            </div>
+            <div id="selectedFiles" class="selected-files" style="display: none;">
+                <h4>Selected Files:</h4>
+                <div class="files-list-container">
+                    <ul id="filesList"></ul>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="extractNames" checked>
+                    <span>Automatically extract student names from documents</span>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="hideDeliverableUploadModal()">
+                Cancel
+            </button>
+            <button type="button" class="btn btn-primary" onclick="uploadDeliverables()" id="uploadDeliverablesBtn"
+                disabled>
+                Upload Deliverables
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Deliverable Modal -->
+<div id="editDeliverableModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Edit Deliverable</h2>
+            <button type="button" class="close" aria-label="Close" onclick="hideEditDeliverableModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <form id="editDeliverableForm">
+            <input type="hidden" id="editDeliverableId">
+            <div class="form-group">
+                <label for="editStudentName">Student Name:</label>
+                <input type="text" id="editStudentName" name="student_name" maxlength="255">
+            </div>
+            <div class="form-group">
+                <label for="editMark">Mark (0-10):</label>
+                <input type="number" id="editMark" name="mark" min="0" max="100" step="0.01">
+            </div>
+            <div class="form-group">
+                <label for="editCertainty">Certainty Threshold (0-1):</label>
+                <input type="number" id="editCertainty" name="certainty_threshold" min="0" max="1" step="0.01">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideEditDeliverableModal()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal" class="modal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h2>Confirm Deletion</h2>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete this deliverable?</p>
+            <p class="warning-text">This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="hideDeleteConfirmModal()">
+                Cancel
+            </button>
+            <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                Delete Deliverable
+            </button>
+        </div>
+    </div>
+</div>

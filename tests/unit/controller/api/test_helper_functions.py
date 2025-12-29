@@ -107,14 +107,24 @@ class TestConvertExtractedRubric:
     def test_convert_extracted_rubric_with_data(self) -> None:
         """Test convert_extracted_rubric with valid data."""
         from src.controller.api.api import convert_extracted_rubric
-        from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
+        from src.repository.db.models import ExtractedRubricModel, GradeLevel, RubricCriterionModel
 
         extracted = ExtractedRubricModel(
             title="Test Rubric",
             total_points=100.0,
             criteria=[
-                RubricCriterionModel(name="Quality", description="Code quality", max_points=50.0, weight=0.5),
-                RubricCriterionModel(name="Style", description="Code style", max_points=50.0, weight=None),
+                RubricCriterionModel(
+                    name="Quality",
+                    max_points=50.0,
+                    weight=0.5,
+                    grades=[GradeLevel(label="Excellent", points=50.0, description="Great")],
+                ),
+                RubricCriterionModel(
+                    name="Style",
+                    max_points=50.0,
+                    weight=None,
+                    grades=[GradeLevel(label="Good", points=40.0, description="Nice")],
+                ),
             ],
             raw_text="Raw rubric text",
         )
@@ -127,6 +137,7 @@ class TestConvertExtractedRubric:
         assert len(result.criteria) == 2
         assert result.criteria[0].name == "Quality"
         assert result.criteria[0].weight == pytest.approx(0.5)
+        assert len(result.criteria[0].grades) == 1
         assert result.criteria[1].name == "Style"
         assert result.criteria[1].weight is None
         assert result.raw_text == "Raw rubric text"

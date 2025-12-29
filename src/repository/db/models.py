@@ -85,18 +85,37 @@ class AssignmentModel(BaseModel):
     )
 
 
+class GradeLevel(BaseModel):
+    """Model representing a performance level within a criterion."""
+
+    label: str = Field(..., max_length=100, description="Grade label (e.g., Excellent, Good, Poor)")
+    points: float = Field(..., ge=0.0, description="Points for this grade level")
+    description: str = Field(default="", description="Description of what this grade level means")
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+
 class RubricCriterionModel(BaseModel):
     """Model representing a single grading criterion from a rubric."""
 
     name: str = Field(..., max_length=255)
-    description: str = Field(default="")
     max_points: float = Field(..., ge=0.0)
     weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    grades: list[GradeLevel] = Field(default_factory=list, description="Performance levels (2-10)")
 
     @field_validator("weight")
     @classmethod
     def validate_weight(cls, v: float | None) -> float | None:
         return round(v, 2) if v is not None else None
+
+    @field_validator("grades")
+    @classmethod
+    def validate_grades(cls, v: list[GradeLevel]) -> list[GradeLevel]:
+        if len(v) > 10:
+            raise ValueError("Maximum 10 grade levels allowed")
+        return v
 
     model_config = ConfigDict(
         populate_by_name=True,

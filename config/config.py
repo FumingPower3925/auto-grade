@@ -4,13 +4,14 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from config.models import DatabaseConfig, LLMConfig, ServerConfig
+from config.models import DatabaseConfig, LLMConfig, OCRConfig, ServerConfig
 
 
 class Config(BaseModel):
     server: ServerConfig = ServerConfig()
     llm: LLMConfig = LLMConfig()
     database: DatabaseConfig = DatabaseConfig()
+    ocr: OCRConfig = OCRConfig()
 
     def __init__(self) -> None:
         toml_config = self._load_toml_config()

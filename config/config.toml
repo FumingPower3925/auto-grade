@@ -4,8 +4,14 @@ port = 8080
 
 [llm]
 provider = "openai"
-model = "o4-mini"
+default_model = "o4-mini"
+smart_model = "gpt-5.2"
 base_url = "https://api.openai.com/v1"
+
+[ocr]
+provider = "mistral"
+model = "mistral-ocr-latest"
+base_url = "https://api.mistral.ai/v1"
 
 [database]
 type = "ferretdb"

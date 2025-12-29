@@ -133,6 +133,19 @@ class DatabaseRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def update_file(self, file_id: str, **kwargs: Any) -> bool:
+        """Update a file's metadata.
+
+        Args:
+            file_id: The ID of the file to update.
+            **kwargs: Fields to update (extracted_rubric, etc.).
+
+        Returns:
+            True if the file was updated, False otherwise.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_file(self, file_id: str) -> FileModel | None:
         """Retrieve a file by its ID.
 

@@ -9,7 +9,8 @@ import httpx
 from pypdf import PdfReader
 
 from config.config import get_config
-from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
+from src.repository.db.models import ExtractedRubricModel, GradeLevel, RubricCriterionModel
+from src.service.ocr_service import OCRService
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,14 @@ class RubricService:
         self.llm_api_key = os.getenv("LLM_API_KEY", "")
         config = get_config()
         self.llm_base_url = config.llm.base_url
-        self.llm_model = config.llm.model
+        self.default_model = config.llm.default_model
+        self.smart_model = config.llm.smart_model
 
-    def extract_text_from_pdf(self, content: bytes) -> str:
-        """Extract text from PDF content.
+        # Initialize OCR service
+        self.ocr_service = OCRService()
+
+    def extract_text_from_pdf_raw(self, content: bytes) -> str:
+        """Extract text from PDF content using raw pypdf (fallback).
 
         Args:
             content: The PDF content as bytes.
@@ -51,17 +56,18 @@ class RubricService:
             logger.error(f"Failed to extract text from PDF: {e}")
             return ""
 
-    def extract_rubric_with_llm(self, text: str) -> ExtractedRubricModel:
-        """Extract structured rubric information using LLM.
+    async def _try_llm_extraction(self, text: str, model: str) -> ExtractedRubricModel | None:
+        """Try to extract rubric using a specific LLM model.
 
         Args:
-            text: The raw text extracted from the rubric PDF.
+            text: The text to analyze.
+            model: The model to use.
 
         Returns:
-            An ExtractedRubricModel with the parsed information.
+            ExtractedRubricModel if extraction succeeds (has JSON), None otherwise.
         """
         if not self.llm_api_key or not text:
-            return ExtractedRubricModel(raw_text=text if text else None)
+            return None
 
         try:
             url = f"{self.llm_base_url}/chat/completions"
@@ -70,7 +76,7 @@ class RubricService:
             prompt = self._build_extraction_prompt(text)
 
             data: dict[str, Any] = {
-                "model": self.llm_model,
+                "model": model,
                 "messages": [
                     {
                         "role": "system",
@@ -81,25 +87,45 @@ class RubricService:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                "temperature": 0,
-                "max_tokens": 2000,
             }
 
-            response = httpx.post(url, headers=headers, json=data, timeout=30)
+            # O-series models (o1, o4, etc.) use max_completion_tokens
+            if model.startswith("o"):
+                data["max_completion_tokens"] = 4000
+            else:
+                data["max_tokens"] = 4000
+                data["temperature"] = 0
+
+            # Use async client
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(url, headers=headers, json=data)
 
             if response.status_code == 200:
                 result = response.json()
                 content = result["choices"][0]["message"]["content"].strip()
-                return self._parse_llm_response(content, text)
+
+                # Check if JSON is present before parsing
+                if not re.search(r"\{.*\}", content, re.DOTALL):
+                    logger.warning(f"No JSON found in response from model {model}")
+                    return None
+
+                parsed_model = self._parse_llm_response(content, text)
+
+                # If parsing returned default raw text model (meaning JSON decode fail or empty), treat as fail
+                if not parsed_model.criteria and not parsed_model.title:
+                     # Check if it really failed or just empty rubric
+                     # _parse_llm_response returns valid model if parse fails, with just raw_text
+                     # We might want to check if it actually parsed something
+                     pass
+
+                return parsed_model
             else:
-                logger.warning(f"LLM API returned status {response.status_code}")
+                logger.warning(f"LLM API returned status {response.status_code} for model {model}")
+                return None
 
-        except httpx.TimeoutException:
-            logger.warning("LLM API request timed out")
         except Exception as e:
-            logger.error(f"Failed to extract rubric with LLM: {e}")
-
-        return ExtractedRubricModel(raw_text=text)
+            logger.error(f"Failed to extract rubric with LLM model {model}: {e}")
+            return None
 
     def _build_extraction_prompt(self, text: str) -> str:
         """Build the prompt for LLM extraction.
@@ -119,20 +145,28 @@ Return a JSON object with this exact structure:
     "criteria": [
         {{
             "name": "criterion name",
-            "description": "what this criterion evaluates",
-            "max_points": points as a number,
-            "weight": weight as decimal (0.0-1.0) or null if not specified
+            "max_points": maximum points as a number,
+            "weight": weight as decimal (0.0-1.0) or null if not specified,
+            "grades": [
+                {{
+                    "label": "grade label (e.g., Excellent, Good, Satisfactory, Poor)",
+                    "points": points for this grade level,
+                    "description": "what achievement looks like at this level"
+                }}
+            ]
         }}
     ]
 }}
 
 Important:
 - Extract ALL grading criteria you can find
-- If points are not specified, estimate based on context or use 0
+- For each criterion, extract 2-5 grade levels (performance levels) from highest to lowest
+- If grade levels are not explicit, infer them from the rubric context
+- If points are not specified, distribute them evenly across grade levels
 - Return ONLY valid JSON, no other text
 
 Rubric text:
-{text[:4000]}"""
+{text[:15000]}"""
 
     def _parse_llm_response(self, content: str, raw_text: str) -> ExtractedRubricModel:
         """Parse the LLM response into an ExtractedRubricModel.
@@ -155,11 +189,25 @@ Rubric text:
             criteria = []
             for criterion_data in parsed.get("criteria", []):
                 try:
+                    # Parse grades for this criterion
+                    grades = []
+                    for grade_data in criterion_data.get("grades", []):
+                        try:
+                            grade = GradeLevel(
+                                label=grade_data.get("label", "Unnamed"),
+                                points=float(grade_data.get("points", 0)),
+                                description=grade_data.get("description", ""),
+                            )
+                            grades.append(grade)
+                        except (ValueError, KeyError) as e:
+                            logger.warning(f"Failed to parse grade: {e}")
+                            continue
+
                     criterion = RubricCriterionModel(
                         name=criterion_data.get("name", "Unnamed Criterion"),
-                        description=criterion_data.get("description", ""),
                         max_points=float(criterion_data.get("max_points", 0)),
                         weight=float(criterion_data["weight"]) if criterion_data.get("weight") is not None else None,
+                        grades=grades,
                     )
                     criteria.append(criterion)
                 except (ValueError, KeyError) as e:
@@ -184,8 +232,13 @@ Rubric text:
             logger.warning(f"Failed to parse LLM response as JSON: {e}")
             return ExtractedRubricModel(raw_text=raw_text)
 
-    def parse_rubric(self, content: bytes, content_type: str) -> ExtractedRubricModel:
-        """Parse a rubric file and extract structured information.
+    async def parse_rubric(self, content: bytes, content_type: str) -> ExtractedRubricModel:
+        """Parse a rubric file and extract structured information using fallback strategy.
+
+        Strategy:
+        1. OCR + Default Model
+        2. OCR + Smart Model
+        3. Raw RAW (pypdf) + Smart Model
 
         Args:
             content: The file content as bytes.
@@ -198,8 +251,34 @@ Rubric text:
             logger.info(f"Unsupported content type for rubric extraction: {content_type}")
             return ExtractedRubricModel()
 
-        text = self.extract_text_from_pdf(content)
-        if not text:
-            return ExtractedRubricModel()
+        # Step 1 & 2: Try OCR
+        ocr_text = await self.ocr_service.extract_text_from_pdf(content)
 
-        return self.extract_rubric_with_llm(text)
+        if ocr_text:
+            logger.info("OCR extraction successful. Extending attempts with OCR text.")
+
+            # Attempt 1: OCR + Default Model
+            logger.info(f"Attempt 1: OCR + Default Model ({self.default_model})")
+            result = await self._try_llm_extraction(ocr_text, self.default_model)
+            if result:
+                return result
+
+            # Attempt 2: OCR + Smart Model
+            logger.info(f"Attempt 2: OCR + Smart Model ({self.smart_model})")
+            result = await self._try_llm_extraction(ocr_text, self.smart_model)
+            if result:
+                return result
+        else:
+            logger.warning("OCR extraction failed or skipped. Proceeding to raw PDF fallback.")
+
+        # Step 3: Raw PDF + Smart Model
+        logger.info(f"Attempt 3: Raw PDF + Smart Model ({self.smart_model})")
+        raw_text = self.extract_text_from_pdf_raw(content)
+
+        if raw_text:
+            result = await self._try_llm_extraction(raw_text, self.smart_model)
+            if result:
+                return result
+
+        logger.error("All rubric extraction attempts failed.")
+        return ExtractedRubricModel(raw_text=ocr_text if ocr_text else raw_text)

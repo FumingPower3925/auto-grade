@@ -18,9 +18,11 @@ from src.controller.api.models import (
     ExtractedRubricResponse,
     FileInfo,
     FileUploadResponse,
+    GradeLevelResponse,
     HealthResponse,
     RubricCriterionResponse,
     UpdateDeliverableRequest,
+    UpdateRubricRequest,
 )
 from src.repository.db.models import ExtractedRubricModel
 from src.service.assignment_service import AssignmentService
@@ -47,9 +49,12 @@ def convert_extracted_rubric(extracted_rubric: ExtractedRubricModel | None) -> E
     criteria = [
         RubricCriterionResponse(
             name=c.name,
-            description=c.description,
             max_points=c.max_points,
             weight=c.weight,
+            grades=[
+                GradeLevelResponse(label=g.label, points=g.points, description=g.description)
+                for g in c.grades
+            ],
         )
         for c in extracted_rubric.criteria
     ]
@@ -209,7 +214,7 @@ async def upload_rubric(assignment_id: str, file: Annotated[UploadFile, File(...
 
     try:
         content = await file.read()
-        file_id = assignment_service.upload_rubric(
+        file_id = await assignment_service.upload_rubric(
             assignment_id=assignment_id,
             filename=file.filename or "rubric",
             content=content,
@@ -267,12 +272,46 @@ async def download_file(file_id: str) -> StreamingResponse:
         return StreamingResponse(
             io.BytesIO(file_model.content),
             media_type=file_model.content_type,
-            headers={"Content-Disposition": f"attachment; filename={file_model.filename}"},
+            headers={"Content-Disposition": f"inline; filename={file_model.filename}"},
         )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to download file") from e
+
+
+@app.patch("/rubrics/{rubric_id}", response_model=ExtractedRubricResponse, tags=["Files"])
+async def update_rubric(rubric_id: str, request: UpdateRubricRequest) -> ExtractedRubricResponse:
+    """Update a rubric's extracted data."""
+    assignment_service = AssignmentService()
+
+    try:
+        criteria_dicts = None
+        if request.criteria is not None:
+            criteria_dicts = [c.model_dump() for c in request.criteria]
+
+        success = assignment_service.update_rubric(
+            rubric_id=rubric_id,
+            title=request.title,
+            total_points=request.total_points,
+            criteria=criteria_dicts,
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update rubric")
+
+        # Fetch updated file to return response
+        file_model = assignment_service.get_file(rubric_id)
+        if not file_model or not file_model.extracted_rubric:
+            raise HTTPException(status_code=500, detail="Failed to retrieve updated rubric")
+
+        return convert_extracted_rubric(file_model.extracted_rubric)  # type: ignore
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to update rubric") from e
 
 
 @app.post("/assignments/{assignment_id}/deliverables", response_model=DeliverableUploadResponse, tags=["Deliverables"])

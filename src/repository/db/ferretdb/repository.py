@@ -215,6 +215,20 @@ class FerretDBRepository(DatabaseRepository):
         except Exception:
             return []
 
+    def update_file(self, file_id: str, **kwargs: Any) -> bool:
+        try:
+            obj_id = ObjectId(file_id)
+
+            # Handle extracted_rubric specially - convert model to dict
+            if "extracted_rubric" in kwargs and kwargs["extracted_rubric"] is not None:
+                kwargs["extracted_rubric"] = kwargs["extracted_rubric"].model_dump()
+
+            result = self.files_collection.update_one({"_id": obj_id}, {"$set": kwargs})
+            modified: bool = result.modified_count > 0
+            return modified
+        except Exception:
+            return False
+
     def store_deliverable(
         self,
         assignment_id: str,
