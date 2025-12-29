@@ -19,8 +19,17 @@ class OCRConfig(BaseModel):
     base_url: str = "https://api.mistral.ai/v1"
 
 
+class EmbeddingConfig(BaseModel):
+    provider: str = "openai"
+    model: str = "text-embedding-3-small"
+    dimensions: int = 1536
+
+
 class DatabaseConfig(BaseModel):
     type: str = "ferretdb"
     host: str = "localhost"
     port: int = 27017
     name: str = "autograde"
+    username: str | None = None
+    password: str | None = None
+
