@@ -162,6 +162,88 @@ class TestDocumentOperations:
         assert call_args[0][0] == {"_id": ObjectId(file_id)}
         assert call_args[0][1]["$set"]["chunks"] == [{"text": "chunk1", "embedding": [0.1]}]
 
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_delete_file_success(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test successful file deletion."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+
+        mock_files_collection = MagicMock()
+        mock_assignments_collection = MagicMock()
+
+        def collection_selector(name: str) -> MagicMock:
+            if name == "files":
+                return mock_files_collection
+            if name == "assignments":
+                return mock_assignments_collection
+            return MagicMock()
+
+        mock_db.__getitem__.side_effect = collection_selector
+
+        file_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
+        assignment_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+
+        mock_files_collection.find_one.return_value = {
+            "_id": file_id,
+            "assignment_id": assignment_id,
+            "gridfs_id": gridfs_id,
+            "file_type": "rubric",
+        }
+
+        mock_delete_result = MagicMock()
+        mock_delete_result.deleted_count = 1
+        mock_files_collection.delete_one.return_value = mock_delete_result
+
+        mock_fs = mock_gridfs.return_value
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+        repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
+
+        result = repo.delete_file(str(file_id))
+
+        assert result is True
+        mock_fs.delete.assert_called_once_with(gridfs_id)
+        mock_files_collection.delete_one.assert_called_once_with({"_id": file_id})
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_delete_file_not_found(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test deleting non-existent file."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+
+        mock_files_collection = MagicMock()
+        mock_db.__getitem__.return_value = mock_files_collection
+        mock_files_collection.find_one.return_value = None
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+
+        result = repo.delete_file("60c72b2f9b1d8e2a1c9d4b7f")
+
+        assert result is False
+        mock_files_collection.delete_one.assert_not_called()
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_delete_file_invalid_id(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test deleting file with invalid ID."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+
+        repo = FerretDBRepository()
+
+        result = repo.delete_file("invalid-id")
+
+        assert result is False
+
     def _setup_mock_collection(self, mock_mongo_client: MagicMock) -> MagicMock:
         """Setup mock MongoDB collection."""
         mock_client = mock_mongo_client.return_value
