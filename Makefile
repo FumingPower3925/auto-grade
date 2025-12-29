@@ -14,7 +14,7 @@ up: ## Start the application
 	docker compose up -d auto-grade ferretdb
 
 down: ## Stop all services
-	docker compose down
+	docker compose down -v
 
 logs: ## View application logs
 	docker compose logs -f auto-grade
