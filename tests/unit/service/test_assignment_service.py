@@ -204,12 +204,16 @@ class TestAssignmentService:
 
             # Verifications
             # 1. Update status to PROCESSING
-            mock_repo.update_file.assert_any_call(file_id, status=ProcessingStatus.PROCESSING, progress=10.0)
+            mock_repo.update_file.assert_any_call(
+                file_id, status=ProcessingStatus.PROCESSING, progress=pytest.approx(10.0)
+            )
 
             # 2. Extract text called
             mock_embedding_service.extract_text_from_content.assert_called_with(content, content_type)
             # Update with extracted text
-            mock_repo.update_file.assert_any_call(file_id, extracted_text="Extracted text content", progress=30.0)
+            mock_repo.update_file.assert_any_call(
+                file_id, extracted_text="Extracted text content", progress=pytest.approx(30.0)
+            )
 
             # 3. Chunk text called
             mock_embedding_service.chunk_text.assert_called_with("Extracted text content")
@@ -224,7 +228,7 @@ class TestAssignmentService:
             final_call = call_args_list[-1]
             kwargs = final_call.kwargs
             assert kwargs["status"] == ProcessingStatus.COMPLETED
-            assert kwargs["progress"] == 100.0
+            assert kwargs["progress"] == pytest.approx(100.0)
             assert "chunks" in kwargs
             assert len(kwargs["chunks"]) == 2
 
@@ -252,7 +256,7 @@ class TestAssignmentService:
                 file_id,
                 status=ProcessingStatus.FAILED,
                 error_message="Failed to extract text from document",
-                progress=0.0,
+                progress=pytest.approx(0.0),
             )
 
     @patch("src.service.assignment_service.get_database_repository")

@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+from typing import Any
 
 from openai import OpenAI
 
@@ -23,7 +24,7 @@ class RecursiveCharacterTextSplitter:
     def split_text(self, text: str) -> list[str]:
         """Split text into chunks."""
         good_splits = self._split_text(text, self._separators)
-        return self._merge_splits(good_splits, self._separators)
+        return self._merge_splits(good_splits)
 
     def _split_text(self, text: str, separators: list[str]) -> list[str]:
         """Split text by separators."""
@@ -47,29 +48,19 @@ class RecursiveCharacterTextSplitter:
     def _length_function(self, text: str) -> int:
         return len(text)
 
-    def _merge_splits(self, splits: list[str], separators: list[str]) -> list[str]:
+    def _merge_splits(self, splits: list[str]) -> list[str]:
         """Merge small splits into chunks."""
-        separator = " "  # Default joiner
-        docs = []
+        separator = " "
+        docs: list[str] = []
         current_doc: list[str] = []
         total = 0
+
         for d in splits:
             _len = self._length_function(d)
-            if total + _len + (len(current_doc) * len(separator)) > self._chunk_size:
-                if total > self._chunk_size:
-                    logger.warning(
-                        f"Created a chunk of size {total}, which is longer than the specified {self._chunk_size}"
-                    )
-                if len(current_doc) > 0:
-                    doc = separator.join(current_doc)
-                    if doc is not None:
-                        docs.append(doc)
-                    while total > self._chunk_overlap or (
-                        total + _len + (len(current_doc) * len(separator)) > self._chunk_size and total > 0
-                    ):
-                        # Simple overlap logic: remove first element
-                        total -= self._length_function(current_doc[0]) + (1 if len(current_doc) > 1 else 0)
-                        current_doc.pop(0)
+            if self._should_start_new_chunk(total, _len, len(current_doc), len(separator)):
+                doc = self._flush_current_doc(current_doc, separator, docs)
+                if doc:
+                    total, current_doc = self._apply_overlap(current_doc, _len, separator)
 
             current_doc.append(d)
             total += _len + (1 if len(current_doc) > 1 else 0)
@@ -79,6 +70,32 @@ class RecursiveCharacterTextSplitter:
             if doc:
                 docs.append(doc)
         return docs
+
+    def _should_start_new_chunk(self, total: int, item_len: int, doc_len: int, sep_len: int) -> bool:
+        """Check if we should start a new chunk."""
+        return total + item_len + (doc_len * sep_len) > self._chunk_size
+
+    def _flush_current_doc(self, current_doc: list[str], separator: str, docs: list[str]) -> str | None:
+        """Flush current doc to docs list and log warning if oversized."""
+        total = sum(self._length_function(s) for s in current_doc) + max(0, len(current_doc) - 1)
+        if total > self._chunk_size:
+            logger.warning(f"Created a chunk of size {total}, which is longer than the specified {self._chunk_size}")
+        if current_doc:
+            doc = separator.join(current_doc)
+            docs.append(doc)
+            return doc
+        return None
+
+    def _apply_overlap(self, current_doc: list[str], next_len: int, separator: str) -> tuple[int, list[str]]:
+        """Apply overlap by removing items from the front of current_doc."""
+        total = sum(self._length_function(s) for s in current_doc) + max(0, len(current_doc) - 1)
+        while current_doc and (
+            total > self._chunk_overlap
+            or (total + next_len + (len(current_doc) * len(separator)) > self._chunk_size and total > 0)
+        ):
+            total -= self._length_function(current_doc[0]) + (1 if len(current_doc) > 1 else 0)
+            current_doc.pop(0)
+        return total, current_doc
 
 
 class EmbeddingService:
@@ -149,61 +166,64 @@ class EmbeddingService:
     async def _extract_text_from_pdf_robust(self, content: bytes) -> str:
         """Extract text from PDF pages, using OCR for low-density pages."""
         try:
-            import asyncio
             from io import BytesIO
 
-            from pypdf import PdfReader, PdfWriter
+            from pypdf import PdfReader
 
             reader = PdfReader(BytesIO(content))
-            full_text_parts = []
-
-            ocr_tasks = []
-            ocr_indices = []
+            full_text_parts: list[str] = []
+            ocr_tasks: list = []
+            ocr_indices: list[int] = []
 
             for i, page in enumerate(reader.pages):
-                extracted_text = page.extract_text() or ""
-
-                # Check density
-                # Page dimensions in points (1/72 inch)
-                width = float(page.mediabox.width)
-                height = float(page.mediabox.height)
-                area = width * height if width > 0 and height > 0 else 1.0
-                density = len(extracted_text) / area if area > 0 else 0
-
-                # Heuristic: < 0.001 chars per point sq is likely image-dominant or empty
-                # e.g. A4 is ~595x842 = 500k points. 500 chars (short para) = 0.001 density.
-                # Adjust threshold: 1 char per 1000 pixels
-
-                if density < 0.0005 or len(extracted_text.strip()) < 50:
-                    logger.info(f"Page {i + 1} low text density ({density:.6f}), queueing for OCR")
-
-                    # Prepare page bytes for OCR
-                    writer = PdfWriter()
-                    writer.add_page(page)
-                    page_bytes_io = BytesIO()
-                    writer.write(page_bytes_io)
-                    page_bytes = page_bytes_io.getvalue()
-
-                    # Add async task
-                    ocr_tasks.append(self.ocr_service.extract_text_from_pdf(page_bytes))
-                    ocr_indices.append(i)
-                    full_text_parts.append("")  # Placeholder
-                else:
-                    full_text_parts.append(extracted_text)
+                result = self._process_pdf_page(page, i, ocr_tasks, ocr_indices)
+                full_text_parts.append(result)
 
             # Run OCR tasks in parallel
             if ocr_tasks:
-                logger.info(f"Running OCR on {len(ocr_tasks)} pages...")
-                ocr_results = await asyncio.gather(*ocr_tasks)
-
-                for idx, result in zip(ocr_indices, ocr_results, strict=False):
-                    if result:
-                        full_text_parts[idx] = result
-                    else:
-                        logger.warning(f"OCR failed for page {idx + 1}")
+                await self._run_ocr_tasks(ocr_tasks, ocr_indices, full_text_parts)
 
             return "\n\n".join(full_text_parts)
 
         except Exception as e:
             logger.error(f"Failed to extract text from PDF robustly: {e}")
             return ""
+
+    def _process_pdf_page(self, page: Any, index: int, ocr_tasks: list, ocr_indices: list[int]) -> str:
+        """Process a single PDF page and queue for OCR if needed."""
+        from io import BytesIO
+
+        from pypdf import PdfWriter
+
+        extracted_text = page.extract_text() or ""
+        width = float(page.mediabox.width)
+        height = float(page.mediabox.height)
+        area = width * height if width > 0 and height > 0 else 1.0
+        density = len(extracted_text) / area if area > 0 else 0
+
+        if density < 0.0005 or len(extracted_text.strip()) < 50:
+            logger.info(f"Page {index + 1} low text density ({density:.6f}), queueing for OCR")
+            writer = PdfWriter()
+            writer.add_page(page)
+            page_bytes_io = BytesIO()
+            writer.write(page_bytes_io)
+            page_bytes = page_bytes_io.getvalue()
+
+            ocr_tasks.append(self.ocr_service.extract_text_from_pdf(page_bytes))
+            ocr_indices.append(index)
+            return ""  # Placeholder
+
+        return extracted_text
+
+    async def _run_ocr_tasks(self, ocr_tasks: list, ocr_indices: list[int], full_text_parts: list[str]) -> None:
+        """Run OCR tasks in parallel and update text parts."""
+        import asyncio
+
+        logger.info(f"Running OCR on {len(ocr_tasks)} pages...")
+        ocr_results = await asyncio.gather(*ocr_tasks)
+
+        for idx, result in zip(ocr_indices, ocr_results, strict=False):
+            if result:
+                full_text_parts[idx] = result
+            else:
+                logger.warning(f"OCR failed for page {idx + 1}")

@@ -107,8 +107,8 @@ class AssignmentService:
             assignment_id, filename, content, content_type, "relevant_document", extracted_text=None, embedding=None
         )
 
-        # Start background processing
-        asyncio.create_task(self._process_document_background(file_id, content, content_type))
+        # Start background processing - store task to prevent GC
+        _ = asyncio.create_task(self._process_document_background(file_id, content, content_type))
 
         return file_id
 

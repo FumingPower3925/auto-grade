@@ -446,8 +446,8 @@
             const fileInput = document.getElementById('fileInput');
 
             if (currentUploadType === 'document' && fileInput.files.length > 0) {
-                for (let i = 0; i < fileInput.files.length; i++) {
-                    formData.append('files', fileInput.files[i]);
+                for (const file of fileInput.files) {
+                    formData.append('files', file);
                 }
             } else {
                 formData.append('file', fileInput.files[0]);

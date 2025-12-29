@@ -317,7 +317,7 @@ class TestAssignmentEndpoints:
         data = response.json()
         assert len(data) == 1
         assert data[0]["status"] == "processing"
-        assert data[0]["progress"] == 50.0
+        assert data[0]["progress"] == pytest.approx(50.0)
 
     @patch("src.controller.api.api.AssignmentService")
     def test_get_documents_status_exception(self, mock_service_class: MagicMock) -> None:
