@@ -107,6 +107,20 @@
                                     </svg>
                                     Edit Rubric
                                 </button>
+                                <button class="btn btn-small btn-danger"
+                                    onclick="confirmDeleteRubric('{{ rubric.id }}')" title="Delete this rubric">
+                                    <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path
+                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                        </path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                    Delete
+                                </button>
                             </div>
                         </div>
                         {% endfor %}
@@ -126,12 +140,40 @@
                     <div id="document-list" class="file-list">
                         {% if documents %}
                         {% for doc in documents %}
-                        <div class="file-item">
-                            <span class="file-name">{{ doc.filename }}</span>
-                            <span class="file-date">{{ doc.uploaded_at.strftime('%Y-%m-%d') }}</span>
-                            <a href="/api/files/{{ doc.id }}" class="btn btn-small" download>
-                                Download
-                            </a>
+                        <div class="file-item document-item">
+                            <div class="document-info">
+                                <span class="file-name">{{ doc.filename }}</span>
+                                <span class="file-date">{{ doc.uploaded_at.strftime('%Y-%m-%d') }}</span>
+                            </div>
+                            <div class="document-actions">
+                                <a href="/api/files/{{ doc.id }}" class="btn btn-small btn-primary" target="_blank"
+                                    title="Open PDF in new tab">
+                                    <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        <polyline points="10 9 9 9 8 9"></polyline>
+                                    </svg>
+                                    View PDF
+                                </a>
+                                <button class="btn btn-small btn-danger" onclick="confirmDeleteDocument('{{ doc.id }}')"
+                                    title="Delete this document">
+                                    <svg class="btn-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path
+                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                        </path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                    Delete
+                                </button>
+                            </div>
                         </div>
                         {% endfor %}
                         {% else %}
@@ -980,6 +1022,54 @@
                 alert('Error saving rubric: ' + error.message);
             }
         });
+
+        // Delete Rubric Functions
+        function confirmDeleteRubric(rubricId) {
+            if (confirm('Are you sure you want to delete this rubric? This will remove the rubric file and all extracted criteria.')) {
+                deleteRubric(rubricId);
+            }
+        }
+
+        async function deleteRubric(rubricId) {
+            try {
+                const response = await fetch(`/api/rubrics/${rubricId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    globalThis.location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Error deleting rubric: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting rubric: ' + error.message);
+            }
+        }
+
+        // Delete Document Functions
+        function confirmDeleteDocument(documentId) {
+            if (confirm('Are you sure you want to delete this document? This will remove the file and all associated embeddings.')) {
+                deleteDocument(documentId);
+            }
+        }
+
+        async function deleteDocument(documentId) {
+            try {
+                const response = await fetch(`/api/files/${documentId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    globalThis.location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Error deleting document: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting document: ' + error.message);
+            }
+        }
     </script>
 </body>
 
