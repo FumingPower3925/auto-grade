@@ -588,7 +588,7 @@ class TestAssignmentOperations:
         mock_config.database.port = 27017
         mock_config.database.name = "testdb"
         mock_config.database.username = "testuser"
-        mock_config.database.password = "testpass"
+        mock_config.database.password = "test_password_placeholder"
         mock_get_config.return_value = mock_config
 
         FerretDBRepository()
@@ -597,7 +597,7 @@ class TestAssignmentOperations:
             host="localhost",
             port=27017,
             username="testuser",
-            password="testpass",
+            password="test_password_placeholder",
         )
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
