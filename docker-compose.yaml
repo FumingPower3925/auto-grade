@@ -32,20 +32,21 @@ services:
         condition: service_healthy
 
   ferretdb:
-    image: ghcr.io/ferretdb/all-in-one:latest
+    image: ghcr.io/ferretdb/ferretdb-eval:2.7.0
     restart: unless-stopped
     ports:
       - "27017:27017"
     environment:
-      - FERRETDB_TELEMETRY=disable
+      - POSTGRES_USER=autograde
+      - POSTGRES_PASSWORD=autograde
     volumes:
-      - ferretdb-data:/state
+      - ferretdb-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/debug/readyz"]
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "mongodb://autograde:autograde@127.0.0.1:27017/"]
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 15s
     networks:
       - auto-grade-network
 
