@@ -11,17 +11,23 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating text embeddings using OpenAI API."""
+    """Service for generating text embeddings using OpenAI-compatible API.
+
+    Supports any embedding provider with an OpenAI-compatible API, including:
+    - OpenAI
+    - Azure OpenAI
+    - Ollama
+    - Local inference servers (vLLM, text-generation-inference, etc.)
+    """
 
     def __init__(self) -> None:
         config = get_config()
         self.embedding_config = config.embedding
         self.llm_config = config.llm
 
-        # Use the LLM base_url for OpenAI API (same provider)
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = os.environ.get("EMBEDDING_API_KEY")
         if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
+            raise ValueError("EMBEDDING_API_KEY environment variable is required")
 
         self.client = OpenAI(
             api_key=api_key,
