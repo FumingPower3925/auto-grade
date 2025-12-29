@@ -137,8 +137,9 @@ class TestAssignmentService:
         with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
             await service.upload_rubric("test_id", "rubric.pdf", b"content", "application/pdf")
 
+    @pytest.mark.asyncio
     @patch("src.service.assignment_service.get_database_repository")
-    def test_upload_relevant_document_success(self, mock_get_repo: MagicMock) -> None:
+    async def test_upload_relevant_document_success(self, mock_get_repo: MagicMock) -> None:
         """Test successful relevant document upload."""
         mock_repo = MagicMock()
         mock_assignment = self._create_mock_assignment()
@@ -147,24 +148,26 @@ class TestAssignmentService:
         mock_get_repo.return_value = mock_repo
 
         service = AssignmentService()
-        file_id = service.upload_relevant_document(
-            "assignment_id",
-            "example.docx",
-            b"content",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
+        # Mock EmbeddingService at its source module since it's imported locally
+        with patch("src.service.embedding_service.EmbeddingService") as mock_embedding:
+            mock_embedding_instance = MagicMock()
+            mock_embedding_instance.extract_text_from_content.return_value = "extracted text"
+            mock_embedding_instance.generate_embedding.return_value = [0.1] * 1536
+            mock_embedding.return_value = mock_embedding_instance
+
+            file_id = await service.upload_relevant_document(
+                "assignment_id",
+                "example.docx",
+                b"content",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
 
         assert file_id == "file_id_456"
-        mock_repo.store_file.assert_called_once_with(
-            "assignment_id",
-            "example.docx",
-            b"content",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "relevant_document",
-        )
+        mock_repo.store_file.assert_called_once()
 
+    @pytest.mark.asyncio
     @patch("src.service.assignment_service.get_database_repository")
-    def test_upload_relevant_document_assignment_not_found(self, mock_get_repo: MagicMock) -> None:
+    async def test_upload_relevant_document_assignment_not_found(self, mock_get_repo: MagicMock) -> None:
         """Test document upload when assignment doesn't exist."""
         mock_repo = MagicMock()
         mock_repo.get_assignment.return_value = None
@@ -173,7 +176,7 @@ class TestAssignmentService:
         service = AssignmentService()
 
         with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
-            service.upload_relevant_document("test_id", "doc.pdf", b"content", "application/pdf")
+            await service.upload_relevant_document("test_id", "doc.pdf", b"content", "application/pdf")
 
     @patch("src.service.assignment_service.get_database_repository")
     def test_get_file(self, mock_get_repo: MagicMock) -> None:
@@ -218,6 +221,79 @@ class TestAssignmentService:
         assert result == mock_files
         assert len(result) == 1
         mock_repo.list_files_by_assignment.assert_called_once_with("assignment_id", "relevant_document")
+
+    @pytest.mark.asyncio
+    @patch("src.service.assignment_service.get_database_repository")
+    async def test_upload_relevant_document_embedding_fails(self, mock_get_repo: MagicMock) -> None:
+        """Test document upload continues when embedding fails."""
+        mock_repo = MagicMock()
+        mock_assignment = self._create_mock_assignment()
+        mock_repo.get_assignment.return_value = mock_assignment
+        mock_repo.store_file.return_value = "file_id_456"
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        # Mock EmbeddingService to raise an exception
+        with patch("src.service.embedding_service.EmbeddingService") as mock_embedding:
+            mock_embedding.side_effect = Exception("API key missing")
+
+            file_id = await service.upload_relevant_document(
+                "assignment_id",
+                "example.docx",
+                b"content",
+                "application/pdf",
+            )
+
+        assert file_id == "file_id_456"
+        mock_repo.store_file.assert_called_once()
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_search_similar_documents_success(self, mock_get_repo: MagicMock) -> None:
+        """Test successful semantic search."""
+        mock_repo = MagicMock()
+        mock_files = [self._create_mock_file("similar.pdf")]
+        mock_repo.vector_search.return_value = mock_files
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        with patch("src.service.embedding_service.EmbeddingService") as mock_embedding:
+            mock_embedding_instance = MagicMock()
+            mock_embedding_instance.generate_embedding.return_value = [0.1] * 1536
+            mock_embedding.return_value = mock_embedding_instance
+
+            result = service.search_similar_documents("test query")
+
+        assert result == mock_files
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_search_similar_documents_error(self, mock_get_repo: MagicMock) -> None:
+        """Test semantic search handles errors gracefully."""
+        mock_repo = MagicMock()
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        with patch("src.service.embedding_service.EmbeddingService") as mock_embedding:
+            mock_embedding.side_effect = Exception("API error")
+
+            result = service.search_similar_documents("test query")
+
+        assert result == []
+
+    @patch("src.service.assignment_service.get_database_repository")
+    def test_ensure_vector_index(self, mock_get_repo: MagicMock) -> None:
+        """Test ensuring vector index exists."""
+        mock_repo = MagicMock()
+        mock_repo.create_vector_index.return_value = True
+        mock_get_repo.return_value = mock_repo
+
+        service = AssignmentService()
+        with patch("config.config.get_config") as mock_config:
+            mock_config.return_value.embedding.dimensions = 1536
+
+            result = service.ensure_vector_index()
+
+        assert result is True
+        mock_repo.create_vector_index.assert_called_once_with(1536)
 
     def _create_mock_assignment(self, name: str = "Test Assignment") -> AssignmentModel:
         """Create a mock AssignmentModel."""

@@ -82,7 +82,9 @@ class AssignmentService:
             assignment_id, filename, content, content_type, "rubric", extracted_rubric
         )
 
-    def upload_relevant_document(self, assignment_id: str, filename: str, content: bytes, content_type: str) -> str:
+    async def upload_relevant_document(
+        self, assignment_id: str, filename: str, content: bytes, content_type: str
+    ) -> str:
         """Upload a relevant document or example for an assignment.
 
         Args:
@@ -98,7 +100,29 @@ class AssignmentService:
         if not assignment:
             raise ValueError(f"Assignment with ID {assignment_id} not found")
 
-        return self.db_repository.store_file(assignment_id, filename, content, content_type, "relevant_document")
+        # Extract text and generate embedding for vector search
+        extracted_text = None
+        embedding = None
+        try:
+            from src.service.embedding_service import EmbeddingService
+
+            embedding_service = EmbeddingService()
+            extracted_text = embedding_service.extract_text_from_content(content, content_type)
+            if extracted_text:
+                embedding = embedding_service.generate_embedding(extracted_text)
+        except Exception:
+            # If embedding fails, still store the document without embedding
+            pass
+
+        return self.db_repository.store_file(
+            assignment_id,
+            filename,
+            content,
+            content_type,
+            "relevant_document",
+            extracted_text=extracted_text,
+            embedding=embedding,
+        )
 
     def get_file(self, file_id: str) -> FileModel | None:
         """Get a file by ID.
@@ -132,6 +156,39 @@ class AssignmentService:
             A list of relevant document files.
         """
         return self.db_repository.list_files_by_assignment(assignment_id, "relevant_document")
+
+    def search_similar_documents(
+        self, query: str, assignment_id: str | None = None, k: int = 5
+    ) -> list[FileModel]:
+        """Search for similar documents using semantic search.
+
+        Args:
+            query: The text query to search for.
+            assignment_id: Optional filter by assignment ID.
+            k: Number of results to return.
+
+        Returns:
+            A list of similar documents sorted by relevance.
+        """
+        try:
+            from src.service.embedding_service import EmbeddingService
+
+            embedding_service = EmbeddingService()
+            query_embedding = embedding_service.generate_embedding(query)
+            return self.db_repository.vector_search(query_embedding, assignment_id, k)
+        except Exception:
+            return []
+
+    def ensure_vector_index(self) -> bool:
+        """Ensure vector index exists for semantic search.
+
+        Returns:
+            True if index exists or was created successfully.
+        """
+        from config.config import get_config
+
+        dimensions = get_config().embedding.dimensions
+        return self.db_repository.create_vector_index(dimensions)
 
     def update_rubric(
         self,

@@ -240,7 +240,7 @@ async def upload_relevant_document(assignment_id: str, file: Annotated[UploadFil
 
     try:
         content = await file.read()
-        file_id = assignment_service.upload_relevant_document(
+        file_id = await assignment_service.upload_relevant_document(
             assignment_id=assignment_id,
             filename=file.filename or "document",
             content=content,
