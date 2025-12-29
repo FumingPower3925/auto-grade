@@ -37,12 +37,12 @@ services:
     ports:
       - "27017:27017"
     environment:
-      - POSTGRES_USER=autograde
-      - POSTGRES_PASSWORD=autograde
+      - POSTGRES_USER=${FERRETDB_USER:-autograde}
+      - POSTGRES_PASSWORD=${FERRETDB_PASSWORD:-autograde}
     volumes:
       - ferretdb-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "mongodb://autograde:autograde@127.0.0.1:27017/"]
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "mongodb://${FERRETDB_USER:-autograde}:${FERRETDB_PASSWORD:-autograde}@127.0.0.1:27017/"]
       interval: 5s
       timeout: 5s
       retries: 10
