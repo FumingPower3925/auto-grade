@@ -144,6 +144,8 @@ class FileModel(BaseModel):
     file_type: str
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     extracted_rubric: ExtractedRubricModel | None = Field(default=None)
+    extracted_text: str | None = Field(default=None, description="Extracted text content for search")
+    embedding: list[float] | None = Field(default=None, description="Vector embedding for semantic search")
 
     @field_serializer("id", "assignment_id")
     def serialize_objectid(self, value: PyObjectId | ObjectId) -> str:
