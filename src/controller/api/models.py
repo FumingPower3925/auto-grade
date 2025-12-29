@@ -34,12 +34,74 @@ class FileUploadResponse(BaseModel):
     message: str
 
 
+class BulkFileUploadResponse(BaseModel):
+    files: list[FileUploadResponse]
+    total_uploaded: int
+    message: str
+
+
 class FileInfo(BaseModel):
     id: str
     filename: str
     content_type: str
     file_type: str
     uploaded_at: str
+    extracted_rubric: "ExtractedRubricResponse | None" = None
+    status: str | None = None
+    progress: float | None = None
+    error_message: str | None = None
+    chunk_count: int | None = None
+
+
+class GradeLevelResponse(BaseModel):
+    """API response model for a performance level."""
+
+    label: str
+    points: float
+    description: str
+
+
+class RubricCriterionResponse(BaseModel):
+    """API response model for a rubric criterion."""
+
+    name: str
+    max_points: float
+    weight: float | None
+    grades: list[GradeLevelResponse]
+
+
+class ExtractedRubricResponse(BaseModel):
+    """API response model for extracted rubric data."""
+
+    title: str | None
+    total_points: float | None
+    criteria: list[RubricCriterionResponse]
+    raw_text: str | None
+
+
+class GradeLevelInput(BaseModel):
+    """API input model for a performance level."""
+
+    label: str = Field(..., max_length=100)
+    points: float = Field(..., ge=0.0)
+    description: str = Field(default="")
+
+
+class RubricCriterionInput(BaseModel):
+    """API input model for a rubric criterion."""
+
+    name: str = Field(..., max_length=255)
+    max_points: float = Field(..., ge=0.0)
+    weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    grades: list[GradeLevelInput] = Field(default_factory=list)
+
+
+class UpdateRubricRequest(BaseModel):
+    """Request model for updating a rubric's extracted data."""
+
+    title: str | None = Field(None, max_length=255, description="Rubric title")
+    total_points: float | None = Field(None, ge=0.0, description="Total points")
+    criteria: list[RubricCriterionInput] | None = Field(None, description="List of grading criteria")
 
 
 class AssignmentDetailResponse(BaseModel):

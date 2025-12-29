@@ -103,17 +103,17 @@ class TestDeliverableService:
 
     @patch("src.service.deliverable_service.httpx.post")
     @patch("src.service.deliverable_service.get_database_repository")
-    def test_extract_name_with_openai_success(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
-        """Test successful name extraction with OpenAI."""
+    def test_extract_name_with_llm_success(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test successful name extraction with LLM."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"choices": [{"message": {"content": "John Smith"}}]}
         mock_post.return_value = mock_response
 
         service = DeliverableService()
-        service.openai_api_key = "test_key"
+        service.llm_api_key = "test_key"
 
-        name = service.extract_name_with_openai("Some text")
+        name = service.extract_name_with_llm("Some text")
         assert name == "John Smith"
 
     @patch("src.service.deliverable_service.httpx.post")
@@ -122,20 +122,20 @@ class TestDeliverableService:
         "exception,expected_log",
         [
             (Exception("API error"), None),
-            (httpx.TimeoutException("Timeout"), "OpenAI API request timed out"),
+            (httpx.TimeoutException("Timeout"), "LLM API request timed out"),
         ],
     )
-    def test_extract_name_with_openai_exceptions(
+    def test_extract_name_with_llm_exceptions(
         self, mock_get_repo: MagicMock, mock_post: MagicMock, exception: Exception, expected_log: str
     ) -> None:
-        """Test OpenAI extraction with various exceptions."""
+        """Test LLM extraction with various exceptions."""
         mock_post.side_effect = exception
 
         service = DeliverableService()
-        service.openai_api_key = "test_key"
+        service.llm_api_key = "test_key"
 
         with patch("src.service.deliverable_service.logger") as mock_logger:
-            name = service.extract_name_with_openai("Some text")
+            name = service.extract_name_with_llm("Some text")
             assert name == "Unknown"
 
             if expected_log:
@@ -143,38 +143,38 @@ class TestDeliverableService:
 
     @patch("src.service.deliverable_service.httpx.post")
     @patch("src.service.deliverable_service.get_database_repository")
-    def test_extract_name_with_openai_non_200_status(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
-        """Test OpenAI API non-200 status code (lines 111-119)."""
+    def test_extract_name_with_llm_non_200_status(self, mock_get_repo: MagicMock, mock_post: MagicMock) -> None:
+        """Test LLM API non-200 status code."""
         mock_response = MagicMock()
         mock_response.status_code = 400
         mock_post.return_value = mock_response
 
         service = DeliverableService()
-        service.openai_api_key = "test_key"
+        service.llm_api_key = "test_key"
 
         with patch("src.service.deliverable_service.logger") as mock_logger:
-            name = service.extract_name_with_openai("Some text")
+            name = service.extract_name_with_llm("Some text")
             assert name == "Unknown"
-            mock_logger.warning.assert_called_with("OpenAI API returned status 400")
+            mock_logger.warning.assert_called_with("LLM API returned status 400")
 
     @patch("src.service.deliverable_service.logger")
     @patch("src.service.deliverable_service.httpx.post")
     @patch("src.service.deliverable_service.get_database_repository")
-    def test_extract_name_with_openai_cleans_result(
+    def test_extract_name_with_llm_cleans_result(
         self, mock_get_repo: MagicMock, mock_post: MagicMock, mock_logger: MagicMock
     ) -> None:
-        """Test OpenAI result cleaning (line 110)."""
+        """Test LLM result cleaning."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"choices": [{"message": {"content": "Name: John Smith"}}]}
         mock_post.return_value = mock_response
 
         service = DeliverableService()
-        service.openai_api_key = "test_key"
+        service.llm_api_key = "test_key"
 
-        name = service.extract_name_with_openai("Some text")
+        name = service.extract_name_with_llm("Some text")
         assert name == "John Smith"
-        mock_logger.info.assert_called_with("OpenAI extracted student name: John Smith")
+        mock_logger.info.assert_called_with("LLM extracted student name: John Smith")
 
     @patch("src.service.deliverable_service.get_database_repository")
     @pytest.mark.parametrize(
@@ -495,10 +495,10 @@ class TestDeliverableService:
 
     @patch("src.service.deliverable_service.PdfReader")
     @patch("src.service.deliverable_service.get_database_repository")
-    def test_extract_student_name_from_pdf_calls_openai(
+    def test_extract_student_name_from_pdf_calls_llm(
         self, mock_get_repo: MagicMock, mock_pdf_reader: MagicMock
     ) -> None:
-        """Test that OpenAI is called when initial extraction returns Unknown."""
+        """Test that LLM is called when initial extraction returns Unknown."""
         mock_page = MagicMock()
         mock_page.extract_text.return_value = "Some text without a clear name pattern"
 
@@ -507,12 +507,12 @@ class TestDeliverableService:
         mock_pdf_reader.return_value = mock_reader_instance
 
         service = DeliverableService()
-        service.openai_api_key = "test_api_key"
+        service.llm_api_key = "test_api_key"
 
-        with patch.object(service, "extract_name_with_openai", return_value="John Doe") as mock_openai:
+        with patch.object(service, "extract_name_with_llm", return_value="John Doe") as mock_llm:
             name, _ = service.extract_student_name_from_pdf(b"pdf content")  # type: ignore
 
-            mock_openai.assert_called_once()
+            mock_llm.assert_called_once()
             assert name == "John Doe"
 
     @patch("src.service.deliverable_service.get_database_repository")

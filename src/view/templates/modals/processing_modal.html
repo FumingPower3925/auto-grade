@@ -1,0 +1,76 @@
+<!-- Processing Progress Modal -->
+<div id="processingModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Processing Documents</h3>
+        </div>
+        <div class="modal-body">
+            <div id="processingSpinner" class="loading-spinner" style="display: none; margin: 20px auto;"></div>
+            <div class="progress-status-text" id="processingStatusText">Initializing...</div>
+            <div class="progress-container" id="processingProgressContainer">
+                <div class="progress-bar" id="processingProgressBar" style="width: 0%">0%</div>
+            </div>
+            <div id="processingDetails" class="processing-details">
+                <!-- List of documents and their status -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="processingCloseBtn" class="btn btn-primary" onclick="closeProcessingModal()" disabled>
+                Close & Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .progress-container {
+        width: 100%;
+        background-color: #f3f3f3;
+        border-radius: 4px;
+        margin: 15px 0;
+        height: 24px;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background-color: #4caf50;
+        text-align: center;
+        line-height: 24px;
+        color: #000;
+        font-weight: bold;
+        transition: width 0.3s ease;
+    }
+
+    .processing-details {
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 10px;
+        font-size: 0.9em;
+        border: 1px solid #eee;
+        padding: 5px;
+    }
+
+    .processing-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        border-bottom: 1px solid #f9f9f9;
+    }
+
+    .processing-item.completed {
+        color: green;
+    }
+
+    .processing-item.processing {
+        color: orange;
+    }
+
+    .processing-item.failed {
+        color: red;
+    }
+
+    .processing-item.queued {
+        color: gray;
+    }
+</style>

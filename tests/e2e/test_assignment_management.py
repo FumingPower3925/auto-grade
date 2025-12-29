@@ -247,3 +247,86 @@ class TestAssignmentManagementE2E:
 
             confirm_button.click()
             page.wait_for_timeout(500)
+
+    def test_rubric_upload_and_edit_workflow(self, page: Page) -> None:
+        """Test uploading a rubric and editing its extracted data."""
+        # Clean up any existing assignments
+        cleanup_assignments_by_name(page, "Rubric E2E Test")
+
+        # Create a new assignment
+        page.click("button:has-text('Create New Assignment')")
+        page.fill("#assignmentName", "Rubric E2E Test")
+        page.fill("#confidenceThreshold", "0.75")
+        page.click("#createAssignmentForm button[type='submit']")
+
+        # Wait for assignment to appear and navigate to it
+        page.wait_for_timeout(1500)
+        # The link wraps around the card, so click the link directly
+        assignment_link = page.locator(".assignment-card-link:has-text('Rubric E2E Test')").first
+        assignment_link.click()
+
+        # Verify on assignment detail page
+        expect(page).to_have_url(re.compile(r"/assignments/[a-f0-9]+"))
+
+        # Click upload rubric button
+        upload_button = page.locator("button:has-text('Upload Rubric')")
+        expect(upload_button).to_be_visible()
+        upload_button.click()
+
+        # Verify upload modal opens
+        upload_modal = page.locator("#uploadModal")
+        expect(upload_modal).to_be_visible()
+
+        # Create a simple PDF-like file for testing
+        page.locator("#fileInput").set_input_files(
+            {
+                "name": "test_rubric.pdf",
+                "mimeType": "application/pdf",
+                "buffer": b"%PDF-1.4 Test rubric content for E2E testing",
+            }
+        )
+
+        # Submit upload
+        page.click("#uploadForm button[type='submit']")
+        page.wait_for_timeout(2000)
+
+        # Page should reload, verify rubric appears
+        rubric_item = page.locator(".rubric-item").first
+        expect(rubric_item).to_be_visible()
+
+        # Click Edit Rubric button
+        edit_button = rubric_item.locator("button:has-text('Edit Rubric')")
+        expect(edit_button).to_be_visible()
+        edit_button.click()
+
+        # Verify rubric modal opens
+        rubric_modal = page.locator("#rubricModal")
+        expect(rubric_modal).to_be_visible(timeout=5000)
+
+        # Fill in rubric details
+        page.fill("#rubricTitle", "E2E Test Rubric")
+
+        # Add a criterion
+        page.click("button:has-text('Add Criterion')")
+        page.wait_for_timeout(500)
+
+        # Fill in criterion details - the criterion auto-expands when added
+        criterion = page.locator(".criterion-item.expanded").first
+        expect(criterion).to_be_visible(timeout=3000)
+        criterion.locator(".criterion-name").fill("Code Quality")
+        criterion.locator(".criterion-max-points").fill("50")
+        criterion.locator(".criterion-weight").fill("50")  # Weight is now percentage
+
+        # Save changes
+        page.click("#saveRubricBtn")
+        page.wait_for_timeout(2000)
+
+        # Verify page reloads and rubric shows criteria badge
+        criteria_badge = page.locator(".criteria-badge")
+        expect(criteria_badge).to_be_visible()
+        expect(criteria_badge).to_contain_text("1 criteria")
+
+        # Clean up - navigate back and delete assignment
+        page.click(".breadcrumbs a:has-text('Home')")
+        page.wait_for_timeout(1000)
+        cleanup_assignments_by_name(page, "Rubric E2E Test")

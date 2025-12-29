@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any
 
 from bson import ObjectId
@@ -85,6 +86,70 @@ class AssignmentModel(BaseModel):
     )
 
 
+class GradeLevel(BaseModel):
+    """Model representing a performance level within a criterion."""
+
+    label: str = Field(..., max_length=100, description="Grade label (e.g., Excellent, Good, Poor)")
+    points: float = Field(..., ge=0.0, description="Points for this grade level")
+    description: str = Field(default="", description="Description of what this grade level means")
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+
+class RubricCriterionModel(BaseModel):
+    """Model representing a single grading criterion from a rubric."""
+
+    name: str = Field(..., max_length=255)
+    max_points: float = Field(..., ge=0.0)
+    weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    grades: list[GradeLevel] = Field(default_factory=list, description="Performance levels (2-10)")
+
+    @field_validator("weight")
+    @classmethod
+    def validate_weight(cls, v: float | None) -> float | None:
+        return round(v, 2) if v is not None else None
+
+    @field_validator("grades")
+    @classmethod
+    def validate_grades(cls, v: list[GradeLevel]) -> list[GradeLevel]:
+        if len(v) > 10:
+            raise ValueError("Maximum 10 grade levels allowed")
+        return v
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+
+class ExtractedRubricModel(BaseModel):
+    """Model representing structured information extracted from a rubric."""
+
+    title: str | None = Field(default=None, max_length=255)
+    total_points: float | None = Field(default=None, ge=0.0)
+    criteria: list[RubricCriterionModel] = Field(default_factory=list)
+    raw_text: str | None = Field(default=None)
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+
+
+class ProcessingStatus(str, Enum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ChunkModel(BaseModel):
+    id: str = Field(default_factory=lambda: str(ObjectId()))
+    text: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    embedding: list[float] | None = None
+
+
 class FileModel(BaseModel):
     id: PyObjectId | ObjectId = Field(default_factory=PyObjectId, alias="_id")
     assignment_id: PyObjectId | ObjectId
@@ -93,6 +158,18 @@ class FileModel(BaseModel):
     content_type: str
     file_type: str
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    extracted_rubric: ExtractedRubricModel | None = Field(default=None)
+
+    # Text Extraction & Indexing
+    extracted_text: str | None = Field(default=None, description="Full extracted text content")
+    embedding: list[float] | None = Field(default=None, description="Document-level embedding (legacy/summary)")
+
+    # Robust Pipeline Fields
+    status: ProcessingStatus = Field(default=ProcessingStatus.COMPLETED)  # Default for backward compatibility
+    progress: float = Field(default=100.0, ge=0.0, le=100.0)
+    error_message: str | None = None
+    chunk_count: int = 0
+    chunks: list[ChunkModel] = Field(default_factory=list, description="Text chunks with embeddings")
 
     @field_serializer("id", "assignment_id")
     def serialize_objectid(self, value: PyObjectId | ObjectId) -> str:

@@ -22,13 +22,14 @@ class TestConfig:
         assert config.server.host == "localhost"
         assert config.server.port == 8080
         assert config.llm.provider == "openai"
-        assert config.llm.model == "o4-mini"
+        assert config.llm.default_model == "o4-mini"
+        assert config.llm.smart_model == "gpt-5.2"
 
     def test_config_loads_from_toml_file(self) -> None:
         """Test Config loads values from TOML file."""
         toml_content: dict[str, Any] = {
             "server": {"host": "0.0.0.0", "port": 9000},
-            "llm": {"provider": "anthropic", "model": "claude-3"},
+            "llm": {"provider": "anthropic", "default_model": "claude-3-haiku", "smart_model": "claude-3-opus"},
         }
 
         with patch("os.path.exists", return_value=True), patch("tomllib.load", return_value=toml_content):
@@ -37,7 +38,8 @@ class TestConfig:
         assert config.server.host == "0.0.0.0"
         assert config.server.port == 9000
         assert config.llm.provider == "anthropic"
-        assert config.llm.model == "claude-3"
+        assert config.llm.default_model == "claude-3-haiku"
+        assert config.llm.smart_model == "claude-3-opus"
 
     def test_config_partial_toml_file(self) -> None:
         """Test Config handles partial TOML with defaults."""
@@ -49,7 +51,8 @@ class TestConfig:
         assert config.server.port == 3000
         assert config.server.host == "localhost"
         assert config.llm.provider == "openai"
-        assert config.llm.model == "o4-mini"
+        assert config.llm.default_model == "o4-mini"
+        assert config.llm.smart_model == "gpt-5.2"
 
     def test_config_empty_toml_file(self) -> None:
         """Test Config handles empty TOML file."""
@@ -59,7 +62,8 @@ class TestConfig:
         assert config.server.host == "localhost"
         assert config.server.port == 8080
         assert config.llm.provider == "openai"
-        assert config.llm.model == "o4-mini"
+        assert config.llm.default_model == "o4-mini"
+        assert config.llm.smart_model == "gpt-5.2"
 
     def test_toml_load_exception_handling(self) -> None:
         """Test Config handles TOML loading exceptions."""
@@ -90,7 +94,8 @@ port = 5000
 
 [llm]
 provider = "test_provider"
-model = "test_model"
+default_model = "test_default"
+smart_model = "test_smart"
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -104,7 +109,8 @@ model = "test_model"
             assert config.server.host == "test.example.com"
             assert config.server.port == 5000
             assert config.llm.provider == "test_provider"
-            assert config.llm.model == "test_model"
+            assert config.llm.default_model == "test_default"
+            assert config.llm.smart_model == "test_smart"
         finally:
             os.unlink(temp_path)
 

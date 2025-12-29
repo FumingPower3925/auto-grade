@@ -74,10 +74,10 @@ class TestAssignmentWorkflow:
         doc_content = b"Test document content"
         response = self.client.post(
             f"/assignments/{assignment_id}/documents",
-            files={"file": ("doc.txt", io.BytesIO(doc_content), "text/plain")},
+            files=[("files", ("doc.txt", io.BytesIO(doc_content), "text/plain"))],
         )
         assert response.status_code == status.HTTP_200_OK
-        doc_id = response.json()["id"]
+        doc_id = response.json()["files"][0]["id"]
 
         response = self.client.get(f"/assignments/{assignment_id}")
         assert response.status_code == status.HTTP_200_OK
@@ -151,4 +151,56 @@ class TestAssignmentWorkflow:
 
     def test_file_download_not_found(self) -> None:
         response = self.client.get("/files/60c72b2f9b1d8e2a1c9d4b7f")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_rubric_update_workflow(self) -> None:
+        """Test complete rubric upload and update workflow."""
+        # Create assignment
+        assignment_data: dict[str, str | float] = {"name": "Rubric Update Test", "confidence_threshold": 0.75}
+        response = self.client.post("/assignments", json=assignment_data)
+        assert response.status_code == status.HTTP_200_OK
+        assignment_id = response.json()["id"]
+        self.test_assignments.append(assignment_id)
+
+        # Upload rubric
+        rubric_content = b"Test rubric PDF content"
+        response = self.client.post(
+            f"/assignments/{assignment_id}/rubrics",
+            files={"file": ("rubric.pdf", io.BytesIO(rubric_content), "application/pdf")},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        rubric_id = response.json()["id"]
+
+        # Update rubric with extracted data
+        update_data = {
+            "title": "Updated Rubric Title",
+            "total_points": 100.0,
+            "criteria": [
+                {"name": "Code Quality", "description": "Quality of code", "max_points": 40.0, "weight": 0.4},
+                {"name": "Documentation", "description": "Code documentation", "max_points": 30.0, "weight": 0.3},
+                {"name": "Testing", "description": "Test coverage", "max_points": 30.0, "weight": 0.3},
+            ],
+        }
+        response = self.client.patch(f"/rubrics/{rubric_id}", json=update_data)
+        assert response.status_code == status.HTTP_200_OK
+
+        updated_rubric = response.json()
+        assert updated_rubric["title"] == "Updated Rubric Title"
+        assert math.isclose(updated_rubric["total_points"], 100.0, rel_tol=1e-6, abs_tol=1e-12)
+        assert len(updated_rubric["criteria"]) == 3
+        assert updated_rubric["criteria"][0]["name"] == "Code Quality"
+
+        # Verify update persisted via assignment detail
+        response = self.client.get(f"/assignments/{assignment_id}")
+        assert response.status_code == status.HTTP_200_OK
+        assignment_detail = response.json()
+
+        rubric_info = assignment_detail["evaluation_rubrics"][0]
+        assert rubric_info["extracted_rubric"] is not None
+        assert rubric_info["extracted_rubric"]["title"] == "Updated Rubric Title"
+
+    def test_rubric_update_not_found(self) -> None:
+        """Test updating non-existent rubric returns 404."""
+        fake_id = "60c72b2f9b1d8e2a1c9d4b7f"
+        response = self.client.patch(f"/rubrics/{fake_id}", json={"title": "New Title"})
         assert response.status_code == status.HTTP_404_NOT_FOUND

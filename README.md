@@ -14,7 +14,6 @@
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Type Checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue)](http://mypy-lang.org/)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](http://makeapullrequest.com)
 
 </div>
 
@@ -30,7 +29,7 @@ A PoC of an automatic bulk assignment grader LLM engine
 | **Code Coverage** | ![Coverage](https://img.shields.io/codecov/c/github/FumingPower3925/auto-grade) - **100% Required** |
 | **Code Quality** | [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=FumingPower3925_auto-grade&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=FumingPower3925_auto-grade) |
 | **Technical Debt** | [![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=FumingPower3925_auto-grade&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=FumingPower3925_auto-grade) |
-| **Dependencies** | ![Dependencies](https://img.shields.io/librariesio/github/FumingPower3925/auto-grade) - Deactivated, waiting for [#784](https://github.com/pyupio/safety/issues/784)
+| **Dependencies** | ![Dependencies](https://img.shields.io/librariesio/github/FumingPower3925/auto-grade) - Deactivated, waiting for [#784](https://github.com/pyupio/safety/issues/784) |
 | **Last Commit** | ![Last Commit](https://img.shields.io/github/last-commit/FumingPower3925/auto-grade) |
 
 </div>
@@ -39,7 +38,7 @@ A PoC of an automatic bulk assignment grader LLM engine
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/FumingPower/auto-grade.git
+   git clone https://github.com/FumingPower3925/auto-grade.git
    cd auto-grade
    ```
 
@@ -51,74 +50,45 @@ A PoC of an automatic bulk assignment grader LLM engine
 
 3. **Run the application**
    ```bash
-   docker compose up --build auto-grade
+   make build  # Build Docker images
+   make up     # Start the application
    ```
 
 The API will be available at `http://localhost:8080/api` and the web interface at `http://localhost:8080`
 
 ## Development Commands
 
-### Running the Application
-```bash
-# Run the application in Docker (production mode)
-docker compose up --build auto-grade
+All commands are available through the Makefile. Run `make help` to see all available commands.
 
-# Run the application in detached mode
-docker compose up --build -d auto-grade
+### Application Management
+```bash
+make build          # Build all Docker images
+make up             # Start the application
+make down           # Stop all services and remove volumes
+make logs           # View application logs
 ```
 
 ### Testing
 ```bash
-# Run all tests
-docker compose --profile test run --build --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test
-
-# Run only unit tests (with 100% coverage requirement)
-docker compose --profile test run --build --rm test uv run pytest tests/unit/ -v --cov-fail-under=100
-
-# Run only integration tests
-docker compose --profile test run --build --rm test uv run pytest tests/integration/ -v
-
-# Run e2e tests
-docker compose --profile test run --rm -e PLAYWRIGHT_BASE_URL=http://auto-grade:8080 test uv run pytest tests/e2e/ -v
-
-# Run tests with coverage report
-docker compose --profile test run --build --rm test uv run pytest tests/unit/ tests/integration/ tests/e2e -v --cov=src --cov=config --cov-report=term
+make test           # Run all tests
+make test-unit      # Run unit tests with 100% coverage requirement
+make test-integration # Run integration tests
+make test-e2e       # Run end-to-end tests with Playwright
 ```
 
 ### Code Quality
 ```bash
-# Run linting
-docker compose run --rm test ruff check .
-
-# Run type checking
-docker compose run --rm test mypy src/ config/
-
-# Run security checks
-docker compose run --rm test bandit -r src/
-
-# Format code
-docker compose run --rm test ruff format .
+make lint           # Run ruff linter with auto-fix and format
+make lint-check     # Check linting without auto-fix
+make type-check     # Run mypy type checking
+make format         # Format code with ruff
+make security       # Run security checks with bandit
 ```
 
 ### Package Management
 ```bash
-# Update uv.lock file after changing dependencies
-uv lock
-
-# Install/update all dependencies from lock file
-uv sync
-```
-
-### Docker Management
-```bash
-# Stop all services
-docker compose down
-
-# Remove all containers and images
-docker compose down --rmi all
-
-# Prune all (suitable to run from time to time)
-docker system prune -a
+uv lock             # Update uv.lock file after changing dependencies
+uv sync             # Install/update all dependencies from lock file
 ```
 
 ## Testing
@@ -153,11 +123,20 @@ The project includes comprehensive testing with multiple layers:
 
 ## Contributing
 
-Any and all contributions are welcome!
+> **⚠️ Important Notice**
+>
+> This project is part of my Master's Thesis at [Universitat Politècnica de Catalunya (UPC)](https://www.upc.edu/).
+> **Until the thesis is presented and defended, I cannot accept external contributions.**
+>
+> After the thesis presentation (expected mid-2025), all contributions will be welcome!
+
+### After Thesis Presentation
+
+Once the thesis is complete, contributions will be welcome! Here's how to contribute:
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Ensure tests pass with 100% coverage (`pytest tests/unit/ --cov-fail-under=100`)
+3. Ensure tests pass with 100% coverage (`make test-unit`)
 4. Commit your changes (`git commit -m 'Add some amazing feature'`)
 5. Push to the branch (`git push origin feature/amazing-feature`)
 6. Open a Pull Request

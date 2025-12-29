@@ -10,16 +10,22 @@ from src.controller.api.models import (
     AssignmentListResponse,
     AssignmentResponse,
     BulkDeliverableUploadResponse,
+    BulkFileUploadResponse,
     CreateAssignmentRequest,
     DeleteResponse,
     DeliverableListResponse,
     DeliverableResponse,
     DeliverableUploadResponse,
+    ExtractedRubricResponse,
     FileInfo,
     FileUploadResponse,
+    GradeLevelResponse,
     HealthResponse,
+    RubricCriterionResponse,
     UpdateDeliverableRequest,
+    UpdateRubricRequest,
 )
+from src.repository.db.models import ExtractedRubricModel
 from src.service.assignment_service import AssignmentService
 from src.service.deliverable_service import DeliverableService
 from src.service.health_service import HealthService
@@ -34,6 +40,29 @@ app = FastAPI(
     version="0.1.0",
     root_path="/api",
 )
+
+
+def convert_extracted_rubric(extracted_rubric: ExtractedRubricModel | None) -> ExtractedRubricResponse | None:
+    """Convert ExtractedRubricModel to API response format."""
+    if extracted_rubric is None:
+        return None
+
+    criteria = [
+        RubricCriterionResponse(
+            name=c.name,
+            max_points=c.max_points,
+            weight=c.weight,
+            grades=[GradeLevelResponse(label=g.label, points=g.points, description=g.description) for g in c.grades],
+        )
+        for c in extracted_rubric.criteria
+    ]
+
+    return ExtractedRubricResponse(
+        title=extracted_rubric.title,
+        total_points=extracted_rubric.total_points,
+        criteria=criteria,
+        raw_text=extracted_rubric.raw_text,
+    )
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
@@ -128,6 +157,7 @@ async def get_assignment(assignment_id: str) -> AssignmentDetailResponse:
                 content_type=rubric.content_type,
                 file_type=rubric.file_type,
                 uploaded_at=rubric.uploaded_at.isoformat(),
+                extracted_rubric=convert_extracted_rubric(rubric.extracted_rubric),
             )
             for rubric in rubrics
         ]
@@ -139,6 +169,10 @@ async def get_assignment(assignment_id: str) -> AssignmentDetailResponse:
                 content_type=doc.content_type,
                 file_type=doc.file_type,
                 uploaded_at=doc.uploaded_at.isoformat(),
+                status=str(doc.status.value) if hasattr(doc, "status") and doc.status else None,
+                progress=doc.progress,
+                error_message=doc.error_message,
+                chunk_count=doc.chunk_count,
             )
             for doc in documents
         ]
@@ -182,7 +216,7 @@ async def upload_rubric(assignment_id: str, file: Annotated[UploadFile, File(...
 
     try:
         content = await file.read()
-        file_id = assignment_service.upload_rubric(
+        file_id = await assignment_service.upload_rubric(
             assignment_id=assignment_id,
             filename=file.filename or "rubric",
             content=content,
@@ -201,30 +235,66 @@ async def upload_rubric(assignment_id: str, file: Annotated[UploadFile, File(...
         raise HTTPException(status_code=500, detail="Failed to upload rubric") from e
 
 
-@app.post("/assignments/{assignment_id}/documents", response_model=FileUploadResponse, tags=["Assignments"])
-async def upload_relevant_document(assignment_id: str, file: Annotated[UploadFile, File(...)]) -> FileUploadResponse:
-    """Upload a relevant document or example for an assignment."""
+@app.post("/assignments/{assignment_id}/documents", response_model=BulkFileUploadResponse, tags=["Assignments"])
+async def upload_relevant_documents(
+    assignment_id: str, files: Annotated[list[UploadFile], File(...)]
+) -> BulkFileUploadResponse:
+    """Upload multiple relevant documents for an assignment (async processing)."""
     assignment_service = AssignmentService()
 
     try:
-        content = await file.read()
-        file_id = assignment_service.upload_relevant_document(
-            assignment_id=assignment_id,
-            filename=file.filename or "document",
-            content=content,
-            content_type=file.content_type or DEFAULT_CONTENT_TYPE,
-        )
+        uploaded_files = []
+        for file in files:
+            content = await file.read()
+            # This returns immediately after queuing background task
+            file_id = assignment_service.upload_relevant_document(
+                assignment_id=assignment_id,
+                filename=file.filename or "document",
+                content=content,
+                content_type=file.content_type or DEFAULT_CONTENT_TYPE,
+            )
+            uploaded_files.append(
+                FileUploadResponse(
+                    id=file_id,
+                    filename=file.filename or "document",
+                    uploaded_at=datetime.datetime.now(datetime.UTC).isoformat(),
+                    message="Document queued for processing",
+                )
+            )
 
-        return FileUploadResponse(
-            id=file_id,
-            filename=file.filename or "document",
-            uploaded_at=datetime.datetime.now(datetime.UTC).isoformat(),
-            message="Document uploaded successfully",
+        return BulkFileUploadResponse(
+            files=uploaded_files,
+            total_uploaded=len(uploaded_files),
+            message=f"Successfully queued {len(uploaded_files)} document(s) for processing",
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to upload document") from e
+        raise HTTPException(status_code=500, detail="Failed to upload documents") from e
+
+
+@app.get("/assignments/{assignment_id}/documents/status", response_model=list[FileInfo], tags=["Assignments"])
+async def get_documents_status(assignment_id: str) -> list[FileInfo]:
+    """Get processing status of relevant documents."""
+    assignment_service = AssignmentService()
+    try:
+        documents = assignment_service.get_documents_status(assignment_id)
+        return [
+            FileInfo(
+                id=str(doc.id),
+                filename=doc.filename,
+                content_type=doc.content_type,
+                file_type=doc.file_type,
+                uploaded_at=doc.uploaded_at.isoformat(),
+                status=str(doc.status.value) if hasattr(doc, "status") and doc.status else None,
+                progress=doc.progress,
+                error_message=doc.error_message,
+                chunk_count=doc.chunk_count,
+            )
+            for doc in documents
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to get documents status") from e
 
 
 @app.get("/files/{file_id}", tags=["Files"])
@@ -240,12 +310,78 @@ async def download_file(file_id: str) -> StreamingResponse:
         return StreamingResponse(
             io.BytesIO(file_model.content),
             media_type=file_model.content_type,
-            headers={"Content-Disposition": f"attachment; filename={file_model.filename}"},
+            headers={"Content-Disposition": f"inline; filename={file_model.filename}"},
         )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Failed to download file") from e
+
+
+@app.patch("/rubrics/{rubric_id}", response_model=ExtractedRubricResponse, tags=["Files"])
+async def update_rubric(rubric_id: str, request: UpdateRubricRequest) -> ExtractedRubricResponse:
+    """Update a rubric's extracted data."""
+    assignment_service = AssignmentService()
+
+    try:
+        criteria_dicts = None
+        if request.criteria is not None:
+            criteria_dicts = [c.model_dump() for c in request.criteria]
+
+        success = assignment_service.update_rubric(
+            rubric_id=rubric_id,
+            title=request.title,
+            total_points=request.total_points,
+            criteria=criteria_dicts,
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update rubric")
+
+        # Fetch updated file to return response
+        file_model = assignment_service.get_file(rubric_id)
+        if not file_model or not file_model.extracted_rubric:
+            raise HTTPException(status_code=500, detail="Failed to retrieve updated rubric")
+
+        return convert_extracted_rubric(file_model.extracted_rubric)  # type: ignore
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to update rubric") from e
+
+
+@app.delete("/rubrics/{rubric_id}", tags=["Files"])
+async def delete_rubric(rubric_id: str) -> dict[str, str]:
+    """Delete a rubric and its extracted data."""
+    assignment_service = AssignmentService()
+
+    try:
+        success = assignment_service.delete_rubric(rubric_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Rubric not found")
+        return {"message": "Rubric deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete rubric") from e
+
+
+@app.delete("/files/{file_id}", tags=["Files"])
+async def delete_file(file_id: str) -> dict[str, str]:
+    """Delete a document file and its embeddings."""
+    assignment_service = AssignmentService()
+
+    try:
+        success = assignment_service.delete_document(file_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return {"message": "Document deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to delete document") from e
 
 
 @app.post("/assignments/{assignment_id}/deliverables", response_model=DeliverableUploadResponse, tags=["Deliverables"])

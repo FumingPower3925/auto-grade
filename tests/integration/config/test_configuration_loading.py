@@ -41,7 +41,7 @@ port = 9090
 
 [llm]
 provider = "test_provider"
-model = "test_model_v2"
+default_model = "test_model_v2"
 temperature = 0.5
 max_tokens = 2048
 
@@ -75,7 +75,7 @@ name = "test_db"
             assert config.server.host == "test.local"
             assert config.server.port == 9090
             assert config.llm.provider == "test_provider"
-            assert config.llm.model == "test_model_v2"
+            assert config.llm.default_model == "test_model_v2"
             assert config.database.name == "test_db"
 
         finally:
@@ -126,7 +126,7 @@ temperature = "not_a_float"
 port = 5555
 
 [llm]
-model = "custom_model"
+default_model = "custom_model"
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -151,7 +151,7 @@ model = "custom_model"
             config = get_config()
 
             assert config.server.port == 5555
-            assert config.llm.model == "custom_model"
+            assert config.llm.default_model == "custom_model"
 
             assert config.server.host == "localhost"
             assert config.llm.provider == "openai"
@@ -164,7 +164,7 @@ model = "custom_model"
     def test_environment_variable_override(self) -> None:
         os.environ["AUTO_GRADE_SERVER_HOST"] = "env.host"
         os.environ["AUTO_GRADE_SERVER_PORT"] = "7777"
-        os.environ["AUTO_GRADE_LLM_MODEL"] = "env_model"
+        os.environ["AUTO_GRADE_LLM_DEFAULT_MODEL"] = "env_model"
 
         try:
             ConfigManager.reset()
@@ -175,7 +175,7 @@ model = "custom_model"
         finally:
             os.environ.pop("AUTO_GRADE_SERVER_HOST", None)
             os.environ.pop("AUTO_GRADE_SERVER_PORT", None)
-            os.environ.pop("AUTO_GRADE_LLM_MODEL", None)
+            os.environ.pop("AUTO_GRADE_LLM_DEFAULT_MODEL", None)
             ConfigManager.reset()
 
     def test_configuration_thread_safety(self) -> None:

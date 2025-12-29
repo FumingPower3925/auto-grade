@@ -14,7 +14,7 @@ up: ## Start the application
 	docker compose up -d auto-grade ferretdb
 
 down: ## Stop all services
-	docker compose down
+	docker compose down -v
 
 logs: ## View application logs
 	docker compose logs -f auto-grade
@@ -36,14 +36,15 @@ test-e2e: ## Run e2e tests
 format: ## Format code with ruff
 	ruff format .
 
-lint: ## Run ruff linter
+lint: ## Run ruff linter and format check
 	ruff check . --fix
+	ruff format .
 
 lint-check: ## Check linting without fixes
 	ruff check .
 
 type-check: ## Run mypy type checking
-	docker compose --profile test run --rm test mypy src/ config/ --ignore-missing-imports
+	mypy src/ config/ --ignore-missing-imports
 
 security: ## Run security checks with bandit
 	docker compose --profile test run --rm test bandit -r src/

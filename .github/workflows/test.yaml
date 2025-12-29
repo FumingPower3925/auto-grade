@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -29,10 +29,10 @@ jobs:
         pip install ruff mypy
     
     - name: Run Ruff linter
-      run: ruff check . --config pyproject.toml || true
+      run: ruff check . --config pyproject.toml
     
     - name: Run Ruff formatter check
-      run: ruff format . --check --config pyproject.toml || true
+      run: ruff format . --check --config pyproject.toml
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -43,10 +43,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
     
     - name: Create .env file
       run: |
@@ -74,6 +74,7 @@ jobs:
         fi
     
     - name: Upload coverage to Codecov
+      if: github.actor != 'dependabot[bot]'
       uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
       with:
         files: ./coverage/coverage.xml
@@ -103,10 +104,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
     
     - name: Create .env file
       run: |
@@ -154,10 +155,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
     
     - name: Create .env file
       run: |
@@ -219,10 +220,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
     
     - name: Create .env file
       run: |

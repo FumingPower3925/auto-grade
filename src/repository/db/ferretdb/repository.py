@@ -11,7 +11,13 @@ from pymongo.errors import ConnectionFailure
 
 from config.config import get_config
 from src.repository.db.base import DatabaseRepository
-from src.repository.db.models import AssignmentModel, DeliverableModel, DocumentModel, FileModel
+from src.repository.db.models import (
+    AssignmentModel,
+    DeliverableModel,
+    DocumentModel,
+    ExtractedRubricModel,
+    FileModel,
+)
 
 MONGO_PUSH = "$push"
 
@@ -19,7 +25,16 @@ MONGO_PUSH = "$push"
 class FerretDBRepository(DatabaseRepository):
     def __init__(self) -> None:
         config = get_config().database
-        self.client: MongoClient[dict[str, Any]] = MongoClient(host=config.host, port=config.port)
+        # Build connection with optional authentication
+        if config.username and config.password:
+            self.client: MongoClient[dict[str, Any]] = MongoClient(
+                host=config.host,
+                port=config.port,
+                username=config.username,
+                password=config.password,
+            )
+        else:
+            self.client = MongoClient(host=config.host, port=config.port)
         self.db: Database[dict[str, Any]] = self.client[config.name]
         self.collection: Collection[dict[str, Any]] = self.db["grades"]
         self.assignments_collection: Collection[dict[str, Any]] = self.db["assignments"]
@@ -58,7 +73,8 @@ class FerretDBRepository(DatabaseRepository):
                 if "gridfs_id" in document:
                     file_data = self.fs.get(document["gridfs_id"])
                     document["document"] = file_data.read()
-                return DocumentModel.model_validate(document)
+                result: DocumentModel = DocumentModel.model_validate(document)
+                return result
             return None
         except Exception:
             return None
@@ -81,7 +97,8 @@ class FerretDBRepository(DatabaseRepository):
             obj_id = ObjectId(assignment_id)
             assignment = self.assignments_collection.find_one({"_id": obj_id})
             if assignment:
-                return AssignmentModel.model_validate(assignment)
+                result: AssignmentModel = AssignmentModel.model_validate(assignment)
+                return result
             return None
         except Exception:
             return None
@@ -113,7 +130,8 @@ class FerretDBRepository(DatabaseRepository):
             self.deliverables_collection.delete_many({"assignment_id": obj_id})
 
             result = self.assignments_collection.delete_one({"_id": obj_id})
-            return result.deleted_count > 0
+            deleted: bool = result.deleted_count > 0
+            return deleted
         except Exception:
             return False
 
@@ -124,11 +142,22 @@ class FerretDBRepository(DatabaseRepository):
             kwargs["updated_at"] = datetime.now(UTC)
 
             result = self.assignments_collection.update_one({"_id": obj_id}, {"$set": kwargs})
-            return result.modified_count > 0
+            modified: bool = result.modified_count > 0
+            return modified
         except Exception:
             return False
 
-    def store_file(self, assignment_id: str, filename: str, content: bytes, content_type: str, file_type: str) -> str:
+    def store_file(
+        self,
+        assignment_id: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        file_type: str,
+        extracted_rubric: ExtractedRubricModel | None = None,
+        extracted_text: str | None = None,
+        embedding: list[float] | None = None,
+    ) -> str:
         obj_id = ObjectId(assignment_id)
 
         gridfs_id = self.fs.put(
@@ -144,6 +173,16 @@ class FerretDBRepository(DatabaseRepository):
             "file_size": len(content),
             "uploaded_at": datetime.now(UTC),
         }
+
+        if extracted_rubric is not None:
+            file_data["extracted_rubric"] = extracted_rubric.model_dump()
+
+        if extracted_text is not None:
+            file_data["extracted_text"] = extracted_text
+
+        if embedding is not None:
+            file_data["embedding"] = embedding
+
         result = self.files_collection.insert_one(file_data)
         file_id = str(result.inserted_id)
 
@@ -166,7 +205,8 @@ class FerretDBRepository(DatabaseRepository):
                 if "gridfs_id" in file_doc:
                     file_data = self.fs.get(file_doc["gridfs_id"])
                     file_doc["content"] = file_data.read()
-                return FileModel.model_validate(file_doc)
+                result: FileModel = FileModel.model_validate(file_doc)
+                return result
             return None
         except Exception:
             return None
@@ -191,6 +231,63 @@ class FerretDBRepository(DatabaseRepository):
             return files
         except Exception:
             return []
+
+    def update_file(self, file_id: str, **kwargs: Any) -> bool:
+        try:
+            obj_id = ObjectId(file_id)
+
+            # Handle extracted_rubric specially - convert model to dict
+            if "extracted_rubric" in kwargs and kwargs["extracted_rubric"] is not None:
+                kwargs["extracted_rubric"] = kwargs["extracted_rubric"].model_dump()
+
+            # Handle chunks specially - convert list of models to list of dicts
+            if "chunks" in kwargs and kwargs["chunks"] is not None:
+                kwargs["chunks"] = [chunk.model_dump() for chunk in kwargs["chunks"]]
+
+            result = self.files_collection.update_one({"_id": obj_id}, {"$set": kwargs})
+            modified: bool = result.modified_count > 0
+            return modified
+        except Exception:
+            return False
+
+    def delete_file(self, file_id: str) -> bool:
+        """Delete a file and its GridFS content.
+
+        Args:
+            file_id: The ID of the file to delete.
+
+        Returns:
+            True if the file was deleted, False otherwise.
+        """
+        try:
+            obj_id = ObjectId(file_id)
+
+            # Get file to find assignment_id and gridfs_id
+            file_doc = self.files_collection.find_one({"_id": obj_id})
+            if not file_doc:
+                return False
+
+            # Delete GridFS content
+            if "gridfs_id" in file_doc:
+                self.fs.delete(file_doc["gridfs_id"])
+
+            # Remove file reference from assignment's rubrics or documents array
+            assignment_id = file_doc.get("assignment_id")
+            file_type = file_doc.get("file_type")
+
+            if assignment_id:
+                update_field = "evaluation_rubrics" if file_type == "rubric" else "relevant_documents"
+                self.assignments_collection.update_one(
+                    {"_id": assignment_id},
+                    {"$pull": {update_field: obj_id}, "$set": {"updated_at": datetime.now(UTC)}},
+                )
+
+            # Delete file document
+            result = self.files_collection.delete_one({"_id": obj_id})
+            deleted: bool = result.deleted_count > 0
+            return deleted
+        except Exception:
+            return False
 
     def store_deliverable(
         self,
@@ -246,7 +343,8 @@ class FerretDBRepository(DatabaseRepository):
                     deliverable["content"] = file_data.read()
                 else:
                     deliverable["content"] = deliverable.get("content", b"")
-                return DeliverableModel.model_validate(deliverable)
+                result: DeliverableModel = DeliverableModel.model_validate(deliverable)
+                return result
             return None
         except Exception:
             return None
@@ -277,7 +375,8 @@ class FerretDBRepository(DatabaseRepository):
             kwargs["updated_at"] = datetime.now(UTC)
 
             result = self.deliverables_collection.update_one({"_id": obj_id}, {"$set": kwargs})
-            return result.modified_count > 0
+            modified: bool = result.modified_count > 0
+            return modified
         except Exception:
             return False
 
@@ -298,6 +397,93 @@ class FerretDBRepository(DatabaseRepository):
             )
 
             result = self.deliverables_collection.delete_one({"_id": obj_id})
-            return result.deleted_count > 0
+            deleted: bool = result.deleted_count > 0
+            return deleted
         except Exception:
             return False
+
+    def create_vector_index(self, dimensions: int = 1536) -> bool:
+        """Create HNSW vector index for semantic search on files collection.
+
+        Args:
+            dimensions: The number of dimensions in the embedding vectors.
+
+        Returns:
+            True if index was created or already exists.
+        """
+        try:
+            # Check if index already exists
+            existing_indexes = list(self.files_collection.list_indexes())
+            for idx in existing_indexes:
+                if idx.get("name") == "embedding_hnsw":
+                    return True
+
+            # Create vector index using FerretDB's cosmosSearch
+            self.db.command(
+                {
+                    "createIndexes": "files",
+                    "indexes": [
+                        {
+                            "name": "embedding_hnsw",
+                            "key": {"embedding": "cosmosSearch"},
+                            "cosmosSearchOptions": {
+                                "kind": "vector-hnsw",
+                                "similarity": "COS",
+                                "dimensions": dimensions,
+                                "m": 16,
+                                "efConstruction": 64,
+                            },
+                        }
+                    ],
+                }
+            )
+            return True
+        except Exception:
+            return False
+
+    def vector_search(
+        self,
+        query_vector: list[float],
+        assignment_id: str | None = None,
+        k: int = 5,
+    ) -> list[FileModel]:
+        """Perform vector similarity search on files.
+
+        Args:
+            query_vector: The query embedding vector.
+            assignment_id: Optional filter by assignment ID.
+            k: Number of nearest neighbors to return.
+
+        Returns:
+            List of FileModel objects sorted by similarity.
+        """
+        try:
+            pipeline: list[dict[str, Any]] = [
+                {
+                    "$search": {
+                        "cosmosSearch": {
+                            "vector": query_vector,
+                            "path": "embedding",
+                            "k": k,
+                        }
+                    }
+                }
+            ]
+
+            # Add assignment filter if specified
+            if assignment_id:
+                obj_id = ObjectId(assignment_id)
+                pipeline.append({"$match": {"assignment_id": obj_id}})
+
+            results: list[FileModel] = []
+            for doc in self.files_collection.aggregate(pipeline):
+                if "gridfs_id" in doc:
+                    doc["content"] = b""  # Don't load full content for search results
+                try:
+                    model = FileModel.model_validate(doc)
+                    results.append(model)
+                except ValidationError:
+                    pass
+            return results
+        except Exception:
+            return []

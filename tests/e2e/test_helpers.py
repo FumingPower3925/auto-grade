@@ -1,4 +1,3 @@
-
 from playwright.sync_api import Locator, Page
 
 
@@ -16,11 +15,7 @@ def _close_delete_modal_if_open(page: Page) -> None:
 
 def _find_confirm_button(page: Page) -> Locator | None:
     """Find the delete confirmation button using multiple selectors."""
-    selectors: list[str] = [
-        "#confirmDeleteBtn",
-        "#deleteConfirmModal button.btn-danger",
-        "#deleteConfirmModal button"
-    ]
+    selectors: list[str] = ["#confirmDeleteBtn", "#deleteConfirmModal button.btn-danger", "#deleteConfirmModal button"]
 
     for selector in selectors[:2]:
         button: Locator = page.locator(selector)
