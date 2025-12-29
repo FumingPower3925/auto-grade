@@ -106,7 +106,7 @@ class TestEmbeddingService:
 
                     assert len(result) == 1536
                     call_args = mock_client.embeddings.create.call_args
-                    assert len(call_args.kwargs["input"]) == 32000
+                    assert len(call_args.kwargs["input"]) == 24000
 
     def test_generate_embedding_api_error(self) -> None:
         """Test embedding generation handles API errors."""

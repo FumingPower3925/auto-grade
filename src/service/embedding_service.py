@@ -47,8 +47,9 @@ class EmbeddingService:
             logger.warning("Empty text provided for embedding, returning zero vector")
             return [0.0] * self.embedding_config.dimensions
 
-        # Truncate text if too long (OpenAI has token limits)
-        max_chars = 8000 * 4  # Rough estimate: 4 chars per token, 8000 token limit
+        # Truncate text if too long (model has 8192 token limit)
+        # Using ~4 chars per token, limit to 6000 tokens (24000 chars) for safety margin
+        max_chars = 6000 * 4  # ~6000 tokens to leave headroom under 8192 limit
         if len(text) > max_chars:
             logger.warning(f"Text too long ({len(text)} chars), truncating to {max_chars}")
             text = text[:max_chars]
