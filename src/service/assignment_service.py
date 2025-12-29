@@ -84,9 +84,7 @@ class AssignmentService:
 
         return self.db_repository.store_file(assignment_id, filename, content, content_type, "rubric", extracted_rubric)
 
-    def upload_relevant_document(
-        self, assignment_id: str, filename: str, content: bytes, content_type: str
-    ) -> str:
+    def upload_relevant_document(self, assignment_id: str, filename: str, content: bytes, content_type: str) -> str:
         """Upload a relevant document and start background processing.
 
         Args:
