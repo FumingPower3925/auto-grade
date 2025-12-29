@@ -57,9 +57,7 @@ class TestRubricService:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"title": "Test", "criteria": []}'}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": '{"title": "Test", "criteria": []}'}}]}
         mock_client.post.return_value = mock_response
 
         with patch.dict("os.environ", {"LLM_API_KEY": "test_key"}):
@@ -136,7 +134,7 @@ class TestRubricService:
     ) -> None:
         """Test strategy 3: OCR fails/skipped, Raw PDF + Smart succeeds."""
         mock_ocr_instance = AsyncMock()
-        mock_ocr_instance.extract_text_from_pdf.return_value = None # OCR Fails
+        mock_ocr_instance.extract_text_from_pdf.return_value = None  # OCR Fails
         mock_ocr_service_cls.return_value = mock_ocr_instance
 
         mock_config = MagicMock()
@@ -184,7 +182,7 @@ class TestRubricService:
             service = RubricService()
 
             with patch.object(service, "_try_llm_extraction", new_callable=AsyncMock) as mock_try:
-                mock_try.return_value = None # All LLM calls fail
+                mock_try.return_value = None  # All LLM calls fail
 
                 result = await service.parse_rubric(b"content", "application/pdf")
 
@@ -267,9 +265,7 @@ class TestRubricService:
         mock_client_cls.return_value.__aenter__.return_value = mock_client
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Just text, no json"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Just text, no json"}}]}
         mock_client.post.return_value = mock_response
 
         with patch.dict("os.environ", {"LLM_API_KEY": "key"}):
@@ -434,9 +430,7 @@ class TestRubricService:
         # Valid JSON but no title/criteria
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": '{"other": "data"}'}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": '{"other": "data"}'}}]}
         mock_client.post.return_value = mock_response
 
         with patch.dict("os.environ", {"LLM_API_KEY": "key"}):

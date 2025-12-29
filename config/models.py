@@ -34,4 +34,3 @@ class DatabaseConfig(BaseModel):
     name: str = "autograde"
     username: str | None = None
     password: str | None = None
-

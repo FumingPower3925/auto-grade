@@ -428,4 +428,3 @@ class TestAssignmentEndpoints:
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert response.json()["detail"] == "Failed to retrieve updated rubric"
-

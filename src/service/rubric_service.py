@@ -113,10 +113,10 @@ class RubricService:
 
                 # If parsing returned default raw text model (meaning JSON decode fail or empty), treat as fail
                 if not parsed_model.criteria and not parsed_model.title:
-                     # Check if it really failed or just empty rubric
-                     # _parse_llm_response returns valid model if parse fails, with just raw_text
-                     # We might want to check if it actually parsed something
-                     pass
+                    # Check if it really failed or just empty rubric
+                    # _parse_llm_response returns valid model if parse fails, with just raw_text
+                    # We might want to check if it actually parsed something
+                    pass
 
                 return parsed_model
             else:

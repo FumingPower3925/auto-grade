@@ -52,10 +52,7 @@ def convert_extracted_rubric(extracted_rubric: ExtractedRubricModel | None) -> E
             name=c.name,
             max_points=c.max_points,
             weight=c.weight,
-            grades=[
-                GradeLevelResponse(label=g.label, points=g.points, description=g.description)
-                for g in c.grades
-            ],
+            grades=[GradeLevelResponse(label=g.label, points=g.points, description=g.description) for g in c.grades],
         )
         for c in extracted_rubric.criteria
     ]

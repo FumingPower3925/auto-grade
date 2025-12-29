@@ -49,7 +49,7 @@ class RecursiveCharacterTextSplitter:
 
     def _merge_splits(self, splits: list[str], separators: list[str]) -> list[str]:
         """Merge small splits into chunks."""
-        separator = " " # Default joiner
+        separator = " "  # Default joiner
         docs = []
         current_doc: list[str] = []
         total = 0
@@ -67,9 +67,9 @@ class RecursiveCharacterTextSplitter:
                     while total > self._chunk_overlap or (
                         total + _len + (len(current_doc) * len(separator)) > self._chunk_size and total > 0
                     ):
-                         # Simple overlap logic: remove first element
-                         total -= self._length_function(current_doc[0]) + (1 if len(current_doc) > 1 else 0)
-                         current_doc.pop(0)
+                        # Simple overlap logic: remove first element
+                        total -= self._length_function(current_doc[0]) + (1 if len(current_doc) > 1 else 0)
+                        current_doc.pop(0)
 
             current_doc.append(d)
             total += _len + (1 if len(current_doc) > 1 else 0)
@@ -93,7 +93,7 @@ class EmbeddingService:
         # Initialize splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=getattr(self.embedding_config, "chunk_size", 1000),
-            chunk_overlap=getattr(self.embedding_config, "chunk_overlap", 200)
+            chunk_overlap=getattr(self.embedding_config, "chunk_overlap", 200),
         )
 
         api_key = os.environ.get("EMBEDDING_API_KEY")
@@ -175,7 +175,7 @@ class EmbeddingService:
                 # Adjust threshold: 1 char per 1000 pixels
 
                 if density < 0.0005 or len(extracted_text.strip()) < 50:
-                    logger.info(f"Page {i+1} low text density ({density:.6f}), queueing for OCR")
+                    logger.info(f"Page {i + 1} low text density ({density:.6f}), queueing for OCR")
 
                     # Prepare page bytes for OCR
                     writer = PdfWriter()
@@ -187,7 +187,7 @@ class EmbeddingService:
                     # Add async task
                     ocr_tasks.append(self.ocr_service.extract_text_from_pdf(page_bytes))
                     ocr_indices.append(i)
-                    full_text_parts.append("") # Placeholder
+                    full_text_parts.append("")  # Placeholder
                 else:
                     full_text_parts.append(extracted_text)
 
@@ -198,9 +198,9 @@ class EmbeddingService:
 
                 for idx, result in zip(ocr_indices, ocr_results, strict=False):
                     if result:
-                         full_text_parts[idx] = result
+                        full_text_parts[idx] = result
                     else:
-                         logger.warning(f"OCR failed for page {idx+1}")
+                        logger.warning(f"OCR failed for page {idx + 1}")
 
             return "\n\n".join(full_text_parts)
 

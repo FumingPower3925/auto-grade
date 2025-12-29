@@ -325,9 +325,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_store_file_with_extracted_rubric(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_store_file_with_extracted_rubric(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test storing file with extracted rubric data."""
         from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
 
@@ -602,9 +600,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_store_file_with_embedding(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_store_file_with_embedding(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test storing file with extracted_text and embedding."""
         assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
         file_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
@@ -646,9 +642,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_create_vector_index_success(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_create_vector_index_success(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test creating vector index successfully."""
         mock_db = self._setup_mock_db(mock_mongo_client)
         mock_files_collection = MagicMock()
@@ -666,9 +660,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_create_vector_index_already_exists(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_create_vector_index_already_exists(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test create_vector_index when index already exists."""
         mock_db = self._setup_mock_db(mock_mongo_client)
         mock_files_collection = MagicMock()
@@ -685,9 +677,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_create_vector_index_error(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_create_vector_index_error(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test create_vector_index handles errors gracefully."""
         mock_db = self._setup_mock_db(mock_mongo_client)
         mock_files_collection = MagicMock()
@@ -703,9 +693,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_vector_search_success(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_vector_search_success(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test vector search returns results."""
         mock_files_collection = self._setup_mock_collection(mock_mongo_client)
 
@@ -732,9 +720,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_vector_search_with_assignment_filter(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_vector_search_with_assignment_filter(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test vector search with assignment ID filter."""
         mock_files_collection = self._setup_mock_collection(mock_mongo_client)
         mock_files_collection.aggregate.return_value = iter([])
@@ -749,9 +735,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_vector_search_validation_error(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_vector_search_validation_error(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test vector search handles validation errors."""
         mock_files_collection = self._setup_mock_collection(mock_mongo_client)
         mock_files_collection.aggregate.return_value = iter([{"_id": "invalid"}])
@@ -765,9 +749,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_vector_search_exception(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_vector_search_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test vector search handles exceptions."""
         mock_files_collection = self._setup_mock_collection(mock_mongo_client)
         mock_files_collection.aggregate.side_effect = Exception("Search error")

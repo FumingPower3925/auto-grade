@@ -32,7 +32,7 @@ class TestRecursiveCharacterTextSplitter:
         splitter = RecursiveCharacterTextSplitter(chunk_size=5, chunk_overlap=0)
         text = "abcde"
         chunks = splitter.split_text(text)
-        assert chunks == ['a b', 'c d', 'e']
+        assert chunks == ["a b", "c d", "e"]
 
     def test_split_text_fallback_char(self):
         # Force fallback to character splitting (empty separator logic)
@@ -47,14 +47,14 @@ class TestRecursiveCharacterTextSplitter:
         # c (1).
         # Yield 'c'.
         # So ['a', 'b', 'c']
-        assert chunks == ['a', 'b', 'c']
+        assert chunks == ["a", "b", "c"]
 
     def test_merge_splits_overlap(self):
         splitter = RecursiveCharacterTextSplitter(chunk_size=5, chunk_overlap=2, separators=[" "])
         text = "a b c d e"
         # Actual Trace from error: ['a b', 'b c', 'c d', 'd e']
         chunks = splitter.split_text(text)
-        assert chunks == ['a b', 'b c', 'c d', 'd e']
+        assert chunks == ["a b", "b c", "c d", "d e"]
 
     def test_length_function(self):
         splitter = RecursiveCharacterTextSplitter(100, 20)
@@ -75,9 +75,7 @@ class TestRecursiveCharacterTextSplitter:
         # Then 'something' starts new chunk.
         assert len(chunks) == 2
         # Check if logger warning called
-        mock_logger.warning.assert_called_with(
-            "Created a chunk of size 34, which is longer than the specified 5"
-        )
+        mock_logger.warning.assert_called_with("Created a chunk of size 34, which is longer than the specified 5")
 
     def test_empty_text(self):
         splitter = RecursiveCharacterTextSplitter(100, 20)

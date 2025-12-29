@@ -82,9 +82,7 @@ class AssignmentService:
         rubric_service = RubricService()
         extracted_rubric = await rubric_service.parse_rubric(content, content_type)
 
-        return self.db_repository.store_file(
-            assignment_id, filename, content, content_type, "rubric", extracted_rubric
-        )
+        return self.db_repository.store_file(assignment_id, filename, content, content_type, "rubric", extracted_rubric)
 
     async def upload_relevant_document(
         self, assignment_id: str, filename: str, content: bytes, content_type: str
@@ -106,13 +104,7 @@ class AssignmentService:
 
         # Initial storage with QUEUED status
         file_id = self.db_repository.store_file(
-            assignment_id,
-            filename,
-            content,
-            content_type,
-            "relevant_document",
-            extracted_text=None,
-            embedding=None
+            assignment_id, filename, content, content_type, "relevant_document", extracted_text=None, embedding=None
         )
 
         # Start background processing
@@ -124,11 +116,10 @@ class AssignmentService:
         """Background task to process document: extract text, chunk, and embed."""
         try:
             # Update status to PROCESSING
-            self.db_repository.update_file(
-                file_id, status=ProcessingStatus.PROCESSING, progress=10.0
-            )
+            self.db_repository.update_file(file_id, status=ProcessingStatus.PROCESSING, progress=10.0)
 
             from src.service.embedding_service import EmbeddingService
+
             embedding_service = EmbeddingService()
 
             # 1. Extract Text
@@ -136,11 +127,7 @@ class AssignmentService:
             if not extracted_text:
                 raise ValueError("Failed to extract text from document")
 
-            self.db_repository.update_file(
-                file_id,
-                extracted_text=extracted_text,
-                progress=30.0
-            )
+            self.db_repository.update_file(file_id, extracted_text=extracted_text, progress=30.0)
 
             # 2. Chunk Text
             chunks_text = await asyncio.to_thread(embedding_service.chunk_text, extracted_text)
@@ -176,23 +163,17 @@ class AssignmentService:
                 chunks=chunks,
                 status=ProcessingStatus.COMPLETED,
                 progress=100.0,
-                error_message=None
+                error_message=None,
             )
             logger.info(f"Document {file_id} processed successfully with {len(chunks)} chunks")
 
         except Exception as e:
             logger.error(f"Failed to process document {file_id}: {e}")
-            self.db_repository.update_file(
-                file_id,
-                status=ProcessingStatus.FAILED,
-                error_message=str(e),
-                progress=0.0
-            )
+            self.db_repository.update_file(file_id, status=ProcessingStatus.FAILED, error_message=str(e), progress=0.0)
 
     def get_documents_status(self, assignment_id: str) -> list[FileModel]:
         """Get the status of all relevant documents for an assignment."""
         return self.db_repository.list_files_by_assignment(assignment_id, "relevant_document")
-
 
     def get_file(self, file_id: str) -> FileModel | None:
         """Get a file by ID.
@@ -227,9 +208,7 @@ class AssignmentService:
         """
         return self.db_repository.list_files_by_assignment(assignment_id, "relevant_document")
 
-    def search_similar_documents(
-        self, query: str, assignment_id: str | None = None, k: int = 5
-    ) -> list[FileModel]:
+    def search_similar_documents(self, query: str, assignment_id: str | None = None, k: int = 5) -> list[FileModel]:
         """Search for similar documents using semantic search.
 
         Args:
@@ -353,4 +332,3 @@ class AssignmentService:
             weight=float(weight_val) if weight_val is not None else None,
             grades=grades,
         )
-

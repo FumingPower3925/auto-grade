@@ -1,4 +1,3 @@
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -161,4 +160,3 @@ class TestConvertExtractedRubric:
         assert result.total_points is None
         assert result.criteria == []
         assert result.raw_text is None
-

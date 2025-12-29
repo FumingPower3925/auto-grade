@@ -380,20 +380,24 @@ class FerretDBRepository(DatabaseRepository):
                     return True
 
             # Create vector index using FerretDB's cosmosSearch
-            self.db.command({
-                "createIndexes": "files",
-                "indexes": [{
-                    "name": "embedding_hnsw",
-                    "key": {"embedding": "cosmosSearch"},
-                    "cosmosSearchOptions": {
-                        "kind": "vector-hnsw",
-                        "similarity": "COS",
-                        "dimensions": dimensions,
-                        "m": 16,
-                        "efConstruction": 64,
-                    },
-                }],
-            })
+            self.db.command(
+                {
+                    "createIndexes": "files",
+                    "indexes": [
+                        {
+                            "name": "embedding_hnsw",
+                            "key": {"embedding": "cosmosSearch"},
+                            "cosmosSearchOptions": {
+                                "kind": "vector-hnsw",
+                                "similarity": "COS",
+                                "dimensions": dimensions,
+                                "m": 16,
+                                "efConstruction": 64,
+                            },
+                        }
+                    ],
+                }
+            )
             return True
         except Exception:
             return False

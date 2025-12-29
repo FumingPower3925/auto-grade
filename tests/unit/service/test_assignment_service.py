@@ -178,7 +178,6 @@ class TestAssignmentService:
         with pytest.raises(ValueError, match="Assignment with ID test_id not found"):
             await service.upload_relevant_document("test_id", "doc.pdf", b"content", "application/pdf")
 
-
     @pytest.mark.asyncio
     @patch("src.service.assignment_service.get_database_repository")
     async def test_process_document_background_success(self, mock_get_repo: MagicMock) -> None:
@@ -205,16 +204,12 @@ class TestAssignmentService:
 
             # Verifications
             # 1. Update status to PROCESSING
-            mock_repo.update_file.assert_any_call(
-                file_id, status=ProcessingStatus.PROCESSING, progress=10.0
-            )
+            mock_repo.update_file.assert_any_call(file_id, status=ProcessingStatus.PROCESSING, progress=10.0)
 
             # 2. Extract text called
             mock_embedding_service.extract_text_from_content.assert_called_with(content, content_type)
             # Update with extracted text
-            mock_repo.update_file.assert_any_call(
-                file_id, extracted_text="Extracted text content", progress=30.0
-            )
+            mock_repo.update_file.assert_any_call(file_id, extracted_text="Extracted text content", progress=30.0)
 
             # 3. Chunk text called
             mock_embedding_service.chunk_text.assert_called_with("Extracted text content")
@@ -257,7 +252,7 @@ class TestAssignmentService:
                 file_id,
                 status=ProcessingStatus.FAILED,
                 error_message="Failed to extract text from document",
-                progress=0.0
+                progress=0.0,
             )
 
     @patch("src.service.assignment_service.get_database_repository")
@@ -524,4 +519,3 @@ class TestAssignmentService:
         call_kwargs = mock_repo.update_file.call_args[1]
         assert len(call_kwargs["extracted_rubric"].criteria) == 1
         assert call_kwargs["extracted_rubric"].criteria[0].name == "Existing"
-

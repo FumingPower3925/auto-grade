@@ -43,13 +43,7 @@ class OCRService:
                 "Content-Type": "application/json",
             }
 
-            payload = {
-                "model": self.model,
-                "document": {
-                    "type": "document_url",
-                    "document_url": data_url
-                }
-            }
+            payload = {"model": self.model, "document": {"type": "document_url", "document_url": data_url}}
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(url, headers=headers, json=payload)

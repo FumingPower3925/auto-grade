@@ -134,8 +134,10 @@ class TestEmbeddingService:
 
                     service = embedding_service.EmbeddingService()
 
-                    with patch("pypdf.PdfReader") as mock_reader_class, \
-                         patch("pypdf.PdfWriter") as mock_writer_class:  # Mock PdfWriter too
+                    with (
+                        patch("pypdf.PdfReader") as mock_reader_class,
+                        patch("pypdf.PdfWriter") as mock_writer_class,
+                    ):  # Mock PdfWriter too
                         mock_page = MagicMock()
                         mock_page.extract_text.return_value = "page content " * 5  # > 50 chars to avoid OCR
                         mock_page.mediabox.width = 50
@@ -161,8 +163,7 @@ class TestEmbeddingService:
 
                     service = embedding_service.EmbeddingService()
 
-                    with patch("pypdf.PdfReader") as mock_reader_class, \
-                         patch("pypdf.PdfWriter") as mock_writer_class:
+                    with patch("pypdf.PdfReader") as mock_reader_class, patch("pypdf.PdfWriter") as mock_writer_class:
                         mock_page1 = MagicMock()
                         mock_page1.extract_text.return_value = "page 1 " * 10
                         mock_page1.mediabox.width = 50
@@ -283,9 +284,7 @@ class TestEmbeddingService:
                     service = embedding_service.EmbeddingService()
                     service.ocr_service.extract_text_from_pdf = AsyncMock(return_value="OCR Text")
 
-                    with patch("pypdf.PdfReader") as mock_reader_class, \
-                         patch("pypdf.PdfWriter") as mock_writer_class:
-
+                    with patch("pypdf.PdfReader") as mock_reader_class, patch("pypdf.PdfWriter") as mock_writer_class:
                         mock_page = MagicMock()
                         # Short text with large area -> Low density
                         mock_page.extract_text.return_value = "Short text"
@@ -318,11 +317,9 @@ class TestEmbeddingService:
                     # Mock return value as None (failed/empty)
                     service.ocr_service.extract_text_from_pdf = AsyncMock(return_value=None)
 
-                    with patch("pypdf.PdfReader") as mock_reader_class, \
-                         patch("pypdf.PdfWriter") as mock_writer_class:
-
+                    with patch("pypdf.PdfReader") as mock_reader_class, patch("pypdf.PdfWriter") as mock_writer_class:
                         mock_page = MagicMock()
-                        mock_page.extract_text.return_value = " " # Empty/Low density
+                        mock_page.extract_text.return_value = " "  # Empty/Low density
                         mock_page.mediabox.width = 1000
                         mock_page.mediabox.height = 1000
 

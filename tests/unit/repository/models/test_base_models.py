@@ -315,4 +315,3 @@ class TestExtractedRubricModel:
         assert dump["title"] == "Test"
         assert dump["total_points"] == 50
         assert len(dump["criteria"]) == 1
-

@@ -40,10 +40,7 @@ class TestOCRService:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "pages": [
-                {"markdown": "# Page 1\nContent"},
-                {"markdown": "# Page 2\nMore Content"}
-            ]
+            "pages": [{"markdown": "# Page 1\nContent"}, {"markdown": "# Page 2\nMore Content"}]
         }
         mock_client.post.return_value = mock_response
 
@@ -99,7 +96,7 @@ class TestOCRService:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"unexpected": "data"} # Missing "pages"
+        mock_response.json.return_value = {"unexpected": "data"}  # Missing "pages"
         mock_client.post.return_value = mock_response
 
         with patch.dict("os.environ", {"OCR_API_KEY": "test_key"}):
@@ -113,10 +110,10 @@ class TestOCRService:
     async def test_extract_text_from_pdf_missing_config(self, mock_get_config: MagicMock) -> None:
         """Test OCR skipped if config/key missing."""
         mock_config = MagicMock()
-        mock_config.ocr.provider = "other" # Not mistral
+        mock_config.ocr.provider = "other"  # Not mistral
         mock_get_config.return_value = mock_config
 
-        service = OCRService() # API key empty by default if not in env
+        service = OCRService()  # API key empty by default if not in env
         result = await service.extract_text_from_pdf(b"content")
         assert result is None
 

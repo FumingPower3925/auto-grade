@@ -204,4 +204,3 @@ class TestAssignmentWorkflow:
         fake_id = "60c72b2f9b1d8e2a1c9d4b7f"
         response = self.client.patch(f"/rubrics/{fake_id}", json={"title": "New Title"})
         assert response.status_code == status.HTTP_404_NOT_FOUND
-

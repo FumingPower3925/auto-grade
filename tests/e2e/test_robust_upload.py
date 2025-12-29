@@ -11,7 +11,7 @@ class TestRobustUploadE2E:
     @pytest.fixture(autouse=True)
     def setup_page(self, page: Page) -> None:
         """Navigate to application before each test."""
-        base_url = os.getenv("PLAYWRIGHT_BASE_URL", "http://auto-grade:8080")  # noqa: S311
+        base_url = os.getenv("PLAYWRIGHT_BASE_URL", "http://auto-grade:8080")  # noqa
         page.goto(base_url)
         self.page = page
         self.base_url = base_url
@@ -27,6 +27,7 @@ class TestRobustUploadE2E:
         # Setup network interception to delay upload for verification of "Uploading" state
         # We store the route to manually continue it after verification
         captured_routes = []
+
         def handle_upload(route: Route):
             captured_routes.append(route)
             # Do not continue yet!
@@ -40,7 +41,7 @@ class TestRobustUploadE2E:
         ).first
         # Fallback if structure is different
         if upload_btn.count() == 0:
-             upload_btn = page.locator("button:has-text('Upload Document')").first
+            upload_btn = page.locator("button:has-text('Upload Document')").first
 
         upload_btn.click()
 
@@ -48,10 +49,12 @@ class TestRobustUploadE2E:
         expect(page.locator("#uploadModalTitle")).to_contain_text("Upload Relevant Document")
 
         # Upload files
-        page.locator("#fileInput").set_input_files([
-            {"name": "doc1.txt", "mimeType": "text/plain", "buffer": b"Content 1"},
-            {"name": "doc2.txt", "mimeType": "text/plain", "buffer": b"Content 2"}
-        ])
+        page.locator("#fileInput").set_input_files(
+            [
+                {"name": "doc1.txt", "mimeType": "text/plain", "buffer": b"Content 1"},
+                {"name": "doc2.txt", "mimeType": "text/plain", "buffer": b"Content 2"},
+            ]
+        )
 
         # Click Submit
         page.click("#uploadForm button[type='submit']")
