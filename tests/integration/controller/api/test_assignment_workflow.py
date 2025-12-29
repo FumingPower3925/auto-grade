@@ -186,7 +186,7 @@ class TestAssignmentWorkflow:
 
         updated_rubric = response.json()
         assert updated_rubric["title"] == "Updated Rubric Title"
-        assert updated_rubric["total_points"] == 100.0
+        assert math.isclose(updated_rubric["total_points"], 100.0, rel_tol=1e-6, abs_tol=1e-12)
         assert len(updated_rubric["criteria"]) == 3
         assert updated_rubric["criteria"][0]["name"] == "Code Quality"
 

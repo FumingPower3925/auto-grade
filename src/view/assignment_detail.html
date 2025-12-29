@@ -672,7 +672,8 @@
             const metaDiv = item.querySelector('.criterion-meta');
 
             titlePreview.textContent = name;
-            metaDiv.innerHTML = `<span>${maxPoints} pts</span>${weight ? `<span>${weight}%</span>` : ''}`;
+            const weightSpan = weight ? `<span>${weight}%</span>` : '';
+            metaDiv.innerHTML = `<span>${maxPoints} pts</span>${weightSpan}`;
 
             calculateTotalPoints();
         }
@@ -685,7 +686,7 @@
             let total = 0;
             const items = document.querySelectorAll('.criterion-item');
             items.forEach(item => {
-                const points = parseFloat(item.querySelector('.criterion-max-points').value) || 0;
+                const points = Number.parseFloat(item.querySelector('.criterion-max-points').value) || 0;
                 total += points;
             });
 
@@ -713,7 +714,7 @@
                 Object.keys(countMap).forEach(count => {
                     if (countMap[count] > maxCount) {
                         maxCount = countMap[count];
-                        gradeCount = parseInt(count);
+                        gradeCount = Number.parseInt(count);
                     }
                 });
             }
@@ -763,17 +764,17 @@
 
             criteriaItems.forEach(item => {
                 const name = item.querySelector('.criterion-name').value.trim();
-                const maxPoints = parseFloat(item.querySelector('.criterion-max-points').value) || 0;
+                const maxPoints = Number.parseFloat(item.querySelector('.criterion-max-points').value) || 0;
                 const weightValue = item.querySelector('.criterion-weight').value;
                 // Convert percentage (0-100) to decimal (0-1) for the API
-                const weight = weightValue ? parseFloat(weightValue) / 100 : null;
+                const weight = weightValue ? Number.parseFloat(weightValue) / 100 : null;
 
                 // Collect grades for this criterion
                 const grades = [];
                 const gradeItems = item.querySelectorAll('.grade-item');
                 gradeItems.forEach(gradeItem => {
                     const label = gradeItem.querySelector('.grade-label').value.trim();
-                    const points = parseFloat(gradeItem.querySelector('.grade-points').value) || 0;
+                    const points = Number.parseFloat(gradeItem.querySelector('.grade-points').value) || 0;
                     const description = gradeItem.querySelector('.grade-description').value.trim();
                     grades.push({ label, points, description });
                 });
@@ -793,7 +794,7 @@
 
             const title = document.getElementById('rubricTitle').value.trim() || null;
             const totalPointsValue = document.getElementById('rubricTotalPoints').value;
-            const totalPoints = totalPointsValue ? parseFloat(totalPointsValue) : null;
+            const totalPoints = totalPointsValue ? Number.parseFloat(totalPointsValue) : null;
             const criteria = collectCriteriaFromForm();
 
             try {
@@ -807,7 +808,7 @@
                     hideRubricModal();
                     hideRubricModal();
                     // Force reload to update the UI with new total points and criteria
-                    window.location.reload();
+                    globalThis.location.reload();
                 } else {
                     const error = await response.json();
                     alert('Error saving rubric: ' + (error.detail || 'Unknown error'));

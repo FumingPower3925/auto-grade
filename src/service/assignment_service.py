@@ -155,41 +155,15 @@ class AssignmentService:
         if not file or file.file_type != "rubric":
             raise ValueError(f"Rubric with ID {rubric_id} not found")
 
-        from src.repository.db.models import ExtractedRubricModel, GradeLevel, RubricCriterionModel
+        from src.repository.db.models import ExtractedRubricModel
 
-        # Build new extracted rubric from existing or create new
         existing = file.extracted_rubric
-        new_title = title if title is not None else (existing.title if existing else None)
-        new_total = total_points if total_points is not None else (existing.total_points if existing else None)
+
+        new_title = self._resolve_value(title, existing.title if existing else None)
+        new_total = self._resolve_value(total_points, existing.total_points if existing else None)
         raw_text = existing.raw_text if existing else None
 
-        new_criteria = []
-        if criteria is not None:
-            for c in criteria:
-                max_pts = c.get("max_points", 0)
-                weight_val = c.get("weight")
-
-                # Parse grades for this criterion
-                grades = []
-                for g in c.get("grades", []):
-                    grades.append(
-                        GradeLevel(
-                            label=str(g.get("label", "Unnamed")),
-                            points=float(g.get("points", 0)),
-                            description=str(g.get("description", "")),
-                        )
-                    )
-
-                new_criteria.append(
-                    RubricCriterionModel(
-                        name=str(c.get("name", "Unnamed")),
-                        max_points=float(max_pts) if max_pts is not None else 0.0,
-                        weight=float(weight_val) if weight_val is not None else None,
-                        grades=grades,
-                    )
-                )
-        elif existing:
-            new_criteria = existing.criteria
+        new_criteria = self._build_criteria(criteria, existing)
 
         extracted_rubric = ExtractedRubricModel(
             title=new_title,
@@ -199,4 +173,57 @@ class AssignmentService:
         )
 
         return self.db_repository.update_file(rubric_id, extracted_rubric=extracted_rubric)
+
+    def _resolve_value(self, new_value: Any, existing_value: Any) -> Any:
+        """Return new_value if not None, otherwise existing_value."""
+        if new_value is not None:
+            return new_value
+        return existing_value
+
+    def _build_criteria(
+        self,
+        criteria: list[dict[str, Any]] | None,
+        existing: Any,
+    ) -> list[Any]:
+        """Build criteria list from input or existing data."""
+
+        if criteria is None:
+            return existing.criteria if existing else []
+
+        new_criteria = []
+        for c in criteria:
+            grades = self._build_grades(c.get("grades", []))
+            criterion = self._build_criterion(c, grades)
+            new_criteria.append(criterion)
+
+        return new_criteria
+
+    def _build_grades(self, grades_data: list[dict[str, Any]]) -> list[Any]:
+        """Build grade levels from input data."""
+        from src.repository.db.models import GradeLevel
+
+        grades = []
+        for g in grades_data:
+            grades.append(
+                GradeLevel(
+                    label=str(g.get("label", "Unnamed")),
+                    points=float(g.get("points", 0)),
+                    description=str(g.get("description", "")),
+                )
+            )
+        return grades
+
+    def _build_criterion(self, c: dict[str, Any], grades: list[Any]) -> Any:
+        """Build a single criterion from input data."""
+        from src.repository.db.models import RubricCriterionModel
+
+        max_pts = c.get("max_points", 0)
+        weight_val = c.get("weight")
+
+        return RubricCriterionModel(
+            name=str(c.get("name", "Unnamed")),
+            max_points=float(max_pts) if max_pts is not None else 0.0,
+            weight=float(weight_val) if weight_val is not None else None,
+            grades=grades,
+        )
 
