@@ -130,6 +130,38 @@ class TestDocumentOperations:
         result = repo.get_document("invalid-id")
         assert result is None
 
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_update_file_chunks(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test updating file with chunks using model_dump."""
+        self._setup_mock_collection(mock_mongo_client)
+        # Mock file collection specifically
+        mock_client = mock_mongo_client.return_value
+        mock_db = mock_client.__getitem__.return_value
+        mock_files_collection = MagicMock()
+        mock_db.__getitem__.side_effect = lambda name: mock_files_collection if name == "files" else MagicMock()
+
+        mock_update_result = MagicMock()
+        mock_update_result.modified_count = 1
+        mock_files_collection.update_one.return_value = mock_update_result
+
+        repo = FerretDBRepository()
+        # Manually set collection because side_effect above might be tricky with __init__
+        repo.files_collection = mock_files_collection
+
+        # Mock chunk model
+        mock_chunk = MagicMock()
+        mock_chunk.model_dump.return_value = {"text": "chunk1", "embedding": [0.1]}
+
+        file_id = "60c72b2f9b1d8e2a1c9d4b7f"
+        result = repo.update_file(file_id, chunks=[mock_chunk])
+
+        assert result is True
+        mock_files_collection.update_one.assert_called_once()
+        call_args = mock_files_collection.update_one.call_args
+        assert call_args[0][0] == {"_id": ObjectId(file_id)}
+        assert call_args[0][1]["$set"]["chunks"] == [{"text": "chunk1", "embedding": [0.1]}]
+
     def _setup_mock_collection(self, mock_mongo_client: MagicMock) -> MagicMock:
         """Setup mock MongoDB collection."""
         mock_client = mock_mongo_client.return_value

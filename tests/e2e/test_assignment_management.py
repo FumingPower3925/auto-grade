@@ -278,11 +278,13 @@ class TestAssignmentManagementE2E:
         expect(upload_modal).to_be_visible()
 
         # Create a simple PDF-like file for testing
-        page.locator("#fileInput").set_input_files({
-            "name": "test_rubric.pdf",
-            "mimeType": "application/pdf",
-            "buffer": b"%PDF-1.4 Test rubric content for E2E testing"
-        })
+        page.locator("#fileInput").set_input_files(
+            {
+                "name": "test_rubric.pdf",
+                "mimeType": "application/pdf",
+                "buffer": b"%PDF-1.4 Test rubric content for E2E testing",
+            }
+        )
 
         # Submit upload
         page.click("#uploadForm button[type='submit']")
@@ -303,7 +305,6 @@ class TestAssignmentManagementE2E:
 
         # Fill in rubric details
         page.fill("#rubricTitle", "E2E Test Rubric")
-
 
         # Add a criterion
         page.click("button:has-text('Add Criterion')")
@@ -329,4 +330,3 @@ class TestAssignmentManagementE2E:
         page.click(".breadcrumbs a:has-text('Home')")
         page.wait_for_timeout(1000)
         cleanup_assignments_by_name(page, "Rubric E2E Test")
-

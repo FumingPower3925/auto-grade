@@ -116,6 +116,8 @@ class DatabaseRepository(ABC):
         content_type: str,
         file_type: str,
         extracted_rubric: ExtractedRubricModel | None = None,
+        extracted_text: str | None = None,
+        embedding: list[float] | None = None,
     ) -> str:
         """Store a file related to an assignment.
 
@@ -126,6 +128,8 @@ class DatabaseRepository(ABC):
             content_type: The MIME type of the file.
             file_type: The type of file ("rubric" or "relevant_document").
             extracted_rubric: Optional extracted rubric data for rubric files.
+            extracted_text: Optional extracted text content for search.
+            embedding: Optional vector embedding for semantic search.
 
         Returns:
             The ID of the stored file.
@@ -243,5 +247,36 @@ class DatabaseRepository(ABC):
 
         Returns:
             True if the deliverable was deleted, False otherwise.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_vector_index(self, dimensions: int = 1536) -> bool:
+        """Create vector index for semantic search.
+
+        Args:
+            dimensions: The number of dimensions in the embedding vectors.
+
+        Returns:
+            True if index was created or already exists.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def vector_search(
+        self,
+        query_vector: list[float],
+        assignment_id: str | None = None,
+        k: int = 5,
+    ) -> list[FileModel]:
+        """Perform vector similarity search on files.
+
+        Args:
+            query_vector: The query embedding vector.
+            assignment_id: Optional filter by assignment ID.
+            k: Number of nearest neighbors to return.
+
+        Returns:
+            List of FileModel objects sorted by similarity.
         """
         raise NotImplementedError

@@ -25,7 +25,16 @@ MONGO_PUSH = "$push"
 class FerretDBRepository(DatabaseRepository):
     def __init__(self) -> None:
         config = get_config().database
-        self.client: MongoClient[dict[str, Any]] = MongoClient(host=config.host, port=config.port)
+        # Build connection with optional authentication
+        if config.username and config.password:
+            self.client: MongoClient[dict[str, Any]] = MongoClient(
+                host=config.host,
+                port=config.port,
+                username=config.username,
+                password=config.password,
+            )
+        else:
+            self.client = MongoClient(host=config.host, port=config.port)
         self.db: Database[dict[str, Any]] = self.client[config.name]
         self.collection: Collection[dict[str, Any]] = self.db["grades"]
         self.assignments_collection: Collection[dict[str, Any]] = self.db["assignments"]
@@ -146,6 +155,8 @@ class FerretDBRepository(DatabaseRepository):
         content_type: str,
         file_type: str,
         extracted_rubric: ExtractedRubricModel | None = None,
+        extracted_text: str | None = None,
+        embedding: list[float] | None = None,
     ) -> str:
         obj_id = ObjectId(assignment_id)
 
@@ -165,6 +176,12 @@ class FerretDBRepository(DatabaseRepository):
 
         if extracted_rubric is not None:
             file_data["extracted_rubric"] = extracted_rubric.model_dump()
+
+        if extracted_text is not None:
+            file_data["extracted_text"] = extracted_text
+
+        if embedding is not None:
+            file_data["embedding"] = embedding
 
         result = self.files_collection.insert_one(file_data)
         file_id = str(result.inserted_id)
@@ -222,6 +239,10 @@ class FerretDBRepository(DatabaseRepository):
             # Handle extracted_rubric specially - convert model to dict
             if "extracted_rubric" in kwargs and kwargs["extracted_rubric"] is not None:
                 kwargs["extracted_rubric"] = kwargs["extracted_rubric"].model_dump()
+
+            # Handle chunks specially - convert list of models to list of dicts
+            if "chunks" in kwargs and kwargs["chunks"] is not None:
+                kwargs["chunks"] = [chunk.model_dump() for chunk in kwargs["chunks"]]
 
             result = self.files_collection.update_one({"_id": obj_id}, {"$set": kwargs})
             modified: bool = result.modified_count > 0
@@ -341,3 +362,89 @@ class FerretDBRepository(DatabaseRepository):
             return deleted
         except Exception:
             return False
+
+    def create_vector_index(self, dimensions: int = 1536) -> bool:
+        """Create HNSW vector index for semantic search on files collection.
+
+        Args:
+            dimensions: The number of dimensions in the embedding vectors.
+
+        Returns:
+            True if index was created or already exists.
+        """
+        try:
+            # Check if index already exists
+            existing_indexes = list(self.files_collection.list_indexes())
+            for idx in existing_indexes:
+                if idx.get("name") == "embedding_hnsw":
+                    return True
+
+            # Create vector index using FerretDB's cosmosSearch
+            self.db.command(
+                {
+                    "createIndexes": "files",
+                    "indexes": [
+                        {
+                            "name": "embedding_hnsw",
+                            "key": {"embedding": "cosmosSearch"},
+                            "cosmosSearchOptions": {
+                                "kind": "vector-hnsw",
+                                "similarity": "COS",
+                                "dimensions": dimensions,
+                                "m": 16,
+                                "efConstruction": 64,
+                            },
+                        }
+                    ],
+                }
+            )
+            return True
+        except Exception:
+            return False
+
+    def vector_search(
+        self,
+        query_vector: list[float],
+        assignment_id: str | None = None,
+        k: int = 5,
+    ) -> list[FileModel]:
+        """Perform vector similarity search on files.
+
+        Args:
+            query_vector: The query embedding vector.
+            assignment_id: Optional filter by assignment ID.
+            k: Number of nearest neighbors to return.
+
+        Returns:
+            List of FileModel objects sorted by similarity.
+        """
+        try:
+            pipeline: list[dict[str, Any]] = [
+                {
+                    "$search": {
+                        "cosmosSearch": {
+                            "vector": query_vector,
+                            "path": "embedding",
+                            "k": k,
+                        }
+                    }
+                }
+            ]
+
+            # Add assignment filter if specified
+            if assignment_id:
+                obj_id = ObjectId(assignment_id)
+                pipeline.append({"$match": {"assignment_id": obj_id}})
+
+            results: list[FileModel] = []
+            for doc in self.files_collection.aggregate(pipeline):
+                if "gridfs_id" in doc:
+                    doc["content"] = b""  # Don't load full content for search results
+                try:
+                    model = FileModel.model_validate(doc)
+                    results.append(model)
+                except ValidationError:
+                    pass
+            return results
+        except Exception:
+            return []

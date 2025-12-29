@@ -325,9 +325,7 @@ class TestAssignmentOperations:
 
     @patch("src.repository.db.ferretdb.repository.GridFS")
     @patch("src.repository.db.ferretdb.repository.MongoClient")
-    def test_store_file_with_extracted_rubric(
-        self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
-    ) -> None:
+    def test_store_file_with_extracted_rubric(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
         """Test storing file with extracted rubric data."""
         from src.repository.db.models import ExtractedRubricModel, RubricCriterionModel
 
@@ -576,3 +574,196 @@ class TestAssignmentOperations:
 
         assert result is False
 
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    @patch("src.repository.db.ferretdb.repository.get_config")
+    def test_init_with_auth(
+        self, mock_get_config: MagicMock, mock_mongo_client: MagicMock, mock_gridfs: MagicMock
+    ) -> None:
+        """Test repository initialization with username/password authentication."""
+        mock_config = MagicMock()
+        mock_config.database.host = "localhost"
+        mock_config.database.port = 27017
+        mock_config.database.name = "testdb"
+        mock_config.database.username = "testuser"
+        mock_config.database.password = "test_password_placeholder"
+        mock_get_config.return_value = mock_config
+
+        FerretDBRepository()
+
+        mock_mongo_client.assert_called_once_with(
+            host="localhost",
+            port=27017,
+            username="testuser",
+            password="test_password_placeholder",
+        )
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_store_file_with_embedding(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test storing file with extracted_text and embedding."""
+        assignment_id = ObjectId("60c72b2f9b1d8e2a1c9d4b7f")
+        file_id = ObjectId("50c72b2f9b1d8e2a1c9d4b7f")
+        gridfs_id = ObjectId("40c72b2f9b1d8e2a1c9d4b7f")
+
+        mock_files_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_assignments_collection = MagicMock()
+
+        mock_fs = mock_gridfs.return_value
+        mock_fs.put.return_value = gridfs_id
+
+        mock_insert_result = MagicMock()
+        mock_insert_result.inserted_id = file_id
+        mock_files_collection.insert_one.return_value = mock_insert_result
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+        repo.assignments_collection = mock_assignments_collection
+        repo.fs = mock_fs
+
+        embedding = [0.1] * 1536
+        result = repo.store_file(
+            str(assignment_id),
+            "test.pdf",
+            b"content",
+            "application/pdf",
+            "relevant_document",
+            extracted_text="Some extracted text",
+            embedding=embedding,
+        )
+
+        assert result == str(file_id)
+
+        call_args = mock_files_collection.insert_one.call_args[0][0]
+        assert "extracted_text" in call_args
+        assert call_args["extracted_text"] == "Some extracted text"
+        assert "embedding" in call_args
+        assert call_args["embedding"] == embedding
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_create_vector_index_success(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test creating vector index successfully."""
+        mock_db = self._setup_mock_db(mock_mongo_client)
+        mock_files_collection = MagicMock()
+        mock_files_collection.list_indexes.return_value = iter([])
+        mock_db.__getitem__ = MagicMock(return_value=mock_files_collection)
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+        repo.db = mock_db
+
+        result = repo.create_vector_index(1536)
+
+        assert result is True
+        mock_db.command.assert_called_once()
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_create_vector_index_already_exists(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test create_vector_index when index already exists."""
+        mock_db = self._setup_mock_db(mock_mongo_client)
+        mock_files_collection = MagicMock()
+        mock_files_collection.list_indexes.return_value = iter([{"name": "embedding_hnsw"}])
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+        repo.db = mock_db
+
+        result = repo.create_vector_index(1536)
+
+        assert result is True
+        mock_db.command.assert_not_called()
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_create_vector_index_error(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test create_vector_index handles errors gracefully."""
+        mock_db = self._setup_mock_db(mock_mongo_client)
+        mock_files_collection = MagicMock()
+        mock_files_collection.list_indexes.side_effect = Exception("DB error")
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+        repo.db = mock_db
+
+        result = repo.create_vector_index(1536)
+
+        assert result is False
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_vector_search_success(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test vector search returns results."""
+        mock_files_collection = self._setup_mock_collection(mock_mongo_client)
+
+        search_results = [
+            {
+                "_id": ObjectId("60c72b2f9b1d8e2a1c9d4b7a"),
+                "assignment_id": ObjectId("60c72b2f9b1d8e2a1c9d4b7f"),
+                "filename": "similar.pdf",
+                "gridfs_id": ObjectId("40c72b2f9b1d8e2a1c9d4b7f"),
+                "content_type": "application/pdf",
+                "file_type": "relevant_document",
+                "uploaded_at": datetime.now(UTC),
+            }
+        ]
+        mock_files_collection.aggregate.return_value = iter(search_results)
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+
+        result = repo.vector_search([0.1] * 1536, k=5)
+
+        assert len(result) == 1
+        assert result[0].filename == "similar.pdf"
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_vector_search_with_assignment_filter(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test vector search with assignment ID filter."""
+        mock_files_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_files_collection.aggregate.return_value = iter([])
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+
+        result = repo.vector_search([0.1] * 1536, assignment_id="60c72b2f9b1d8e2a1c9d4b7f", k=5)
+
+        assert result == []
+        mock_files_collection.aggregate.assert_called_once()
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_vector_search_validation_error(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test vector search handles validation errors."""
+        mock_files_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_files_collection.aggregate.return_value = iter([{"_id": "invalid"}])
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+
+        result = repo.vector_search([0.1] * 1536, k=5)
+
+        assert result == []
+
+    @patch("src.repository.db.ferretdb.repository.GridFS")
+    @patch("src.repository.db.ferretdb.repository.MongoClient")
+    def test_vector_search_exception(self, mock_mongo_client: MagicMock, mock_gridfs: MagicMock) -> None:
+        """Test vector search handles exceptions."""
+        mock_files_collection = self._setup_mock_collection(mock_mongo_client)
+        mock_files_collection.aggregate.side_effect = Exception("Search error")
+
+        repo = FerretDBRepository()
+        repo.files_collection = mock_files_collection
+
+        result = repo.vector_search([0.1] * 1536, k=5)
+
+        assert result == []
+
+    def _setup_mock_db(self, mock_mongo_client: MagicMock) -> MagicMock:
+        """Setup mock MongoDB database."""
+        mock_client = mock_mongo_client.return_value
+        mock_db = MagicMock()
+        mock_client.__getitem__.return_value = mock_db
+        return mock_db

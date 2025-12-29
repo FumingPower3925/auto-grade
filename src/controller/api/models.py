@@ -34,6 +34,12 @@ class FileUploadResponse(BaseModel):
     message: str
 
 
+class BulkFileUploadResponse(BaseModel):
+    files: list[FileUploadResponse]
+    total_uploaded: int
+    message: str
+
+
 class FileInfo(BaseModel):
     id: str
     filename: str
@@ -41,6 +47,10 @@ class FileInfo(BaseModel):
     file_type: str
     uploaded_at: str
     extracted_rubric: "ExtractedRubricResponse | None" = None
+    status: str | None = None
+    progress: float | None = None
+    error_message: str | None = None
+    chunk_count: int | None = None
 
 
 class GradeLevelResponse(BaseModel):

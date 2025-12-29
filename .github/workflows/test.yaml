@@ -29,10 +29,10 @@ jobs:
         pip install ruff mypy
     
     - name: Run Ruff linter
-      run: ruff check . --config pyproject.toml || true
+      run: ruff check . --config pyproject.toml
     
     - name: Run Ruff formatter check
-      run: ruff format . --check --config pyproject.toml || true
+      run: ruff format . --check --config pyproject.toml
 
   unit-tests:
     runs-on: ubuntu-latest

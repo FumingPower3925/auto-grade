@@ -36,8 +36,9 @@ test-e2e: ## Run e2e tests
 format: ## Format code with ruff
 	ruff format .
 
-lint: ## Run ruff linter
+lint: ## Run ruff linter and format check
 	ruff check . --fix
+	ruff format .
 
 lint-check: ## Check linting without fixes
 	ruff check .

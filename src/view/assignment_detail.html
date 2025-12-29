@@ -71,7 +71,7 @@
                             + Upload Rubric
                         </button>
                     </div>
-                    <div class="file-list">
+                    <div id="rubric-list" class="file-list">
                         {% if rubrics %}
                         {% for rubric in rubrics %}
                         <div class="file-item rubric-item">
@@ -123,7 +123,7 @@
                             + Upload Document
                         </button>
                     </div>
-                    <div class="file-list">
+                    <div id="document-list" class="file-list">
                         {% if documents %}
                         {% for doc in documents %}
                         <div class="file-item">
@@ -148,6 +148,7 @@
     {% include 'templates/modals/deliverable_modals.html' %}
 
     {% include 'templates/modals/rubric_modal.html' %}
+    {% include 'templates/modals/processing_modal.html' %}
 
     <script>
         let currentUploadType = '';
@@ -417,11 +418,14 @@
             currentUploadType = type;
             const modal = document.getElementById('uploadModal');
             const title = document.getElementById('uploadModalTitle');
+            const fileInput = document.getElementById('fileInput');
 
             if (type === 'rubric') {
                 title.textContent = 'Upload Evaluation Rubric';
+                fileInput.removeAttribute('multiple');
             } else {
                 title.textContent = 'Upload Relevant Document';
+                fileInput.setAttribute('multiple', '');
             }
 
 
@@ -435,49 +439,208 @@
             document.body.classList.remove('modal-open');
         }
 
-        document.getElementById('uploadForm').addEventListener('submit', async function (e) {
-            e.preventDefault();
-
+        // Helper functions for upload form
+        function prepareFormData(fileInput) {
             const formData = new FormData();
-            const fileInput = document.getElementById('fileInput');
-            formData.append('file', fileInput.files[0]);
+            if (currentUploadType === 'document' && fileInput.files.length > 0) {
+                for (const file of fileInput.files) {
+                    formData.append('files', file);
+                }
+            } else {
+                formData.append('file', fileInput.files[0]);
+            }
+            return formData;
+        }
 
-            const endpoint = currentUploadType === 'rubric'
+        function getUploadEndpoint() {
+            return currentUploadType === 'rubric'
                 ? `/api/assignments/${assignmentId}/rubrics`
                 : `/api/assignments/${assignmentId}/documents`;
+        }
 
-            // Show processing overlay for rubric uploads
+        function showPreUploadUI() {
+            hideUploadModal();
             if (currentUploadType === 'rubric') {
-                hideUploadModal();
-                // Re-add modal-open class to keep body scroll disabled during processing
                 document.body.classList.add('modal-open');
                 document.getElementById('uploadProcessingOverlay').classList.add('active');
             } else {
-                hideUploadModal();
+                showProcessingModal('uploading');
             }
+        }
+
+        function hideProcessingUI() {
+            document.getElementById('uploadProcessingOverlay').classList.remove('active');
+            if (currentUploadType === 'rubric') {
+                document.body.classList.remove('modal-open');
+            }
+        }
+
+        function handleUploadSuccess() {
+            if (currentUploadType === 'rubric') {
+                globalThis.location.reload();
+            } else {
+                showProcessingModal('processing');
+                startProcessingPolling();
+            }
+        }
+
+        function handleUploadError(error) {
+            if (currentUploadType === 'document') {
+                document.getElementById('processingStatusText').textContent = 'Upload Failed';
+                document.getElementById('processingSpinner').style.display = 'none';
+                document.getElementById('processingCloseBtn').disabled = false;
+            }
+            alert('Error uploading file: ' + (error.detail || error.message || 'Unknown error'));
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            const formData = prepareFormData(fileInput);
+            const endpoint = getUploadEndpoint();
+
+            showPreUploadUI();
 
             try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                // Hide processing overlay
-                document.getElementById('uploadProcessingOverlay').classList.remove('active');
-                document.body.classList.remove('modal-open');
+                const response = await fetch(endpoint, { method: 'POST', body: formData });
+                hideProcessingUI();
 
                 if (response.ok) {
-                    globalThis.location.reload();
+                    handleUploadSuccess();
                 } else {
                     const error = await response.json();
-                    alert('Error uploading file: ' + (error.detail || 'Unknown error'));
+                    handleUploadError(error);
                 }
             } catch (error) {
-                document.getElementById('uploadProcessingOverlay').classList.remove('active');
-                document.body.classList.remove('modal-open');
-                alert('Error uploading file: ' + error.message);
+                hideProcessingUI();
+                if (currentUploadType === 'document') {
+                    closeProcessingModal();
+                }
+                handleUploadError(error);
             }
         });
+
+        // Processing Modal Functions
+        let processingInterval = null;
+
+        function showProcessingModal(state = 'initializing') {
+            const modal = document.getElementById('processingModal');
+            modal.style.display = 'flex';
+            document.body.classList.add('modal-open');
+            document.getElementById('processingCloseBtn').disabled = true;
+
+            const spinner = document.getElementById('processingSpinner');
+            const progressContainer = document.getElementById('processingProgressContainer');
+            const details = document.getElementById('processingDetails');
+            const statusText = document.getElementById('processingStatusText');
+
+            if (state === 'uploading') {
+                spinner.style.display = 'block';
+                progressContainer.style.display = 'none';
+                details.style.display = 'none';
+                statusText.textContent = 'Uploading documents...';
+            } else {
+                spinner.style.display = 'none';
+                progressContainer.style.display = 'block';
+                details.style.display = 'block';
+
+                if (state === 'initializing') {
+                    document.getElementById('processingProgressBar').style.width = '0%';
+                    document.getElementById('processingProgressBar').textContent = '0%';
+                    details.innerHTML = '';
+                    statusText.textContent = 'Initializing...';
+                }
+            }
+        }
+
+        function closeProcessingModal() {
+            const modal = document.getElementById('processingModal');
+            modal.style.display = 'none';
+            document.body.classList.remove('modal-open');
+            if (processingInterval) clearInterval(processingInterval);
+            globalThis.location.reload();
+        }
+
+        function startProcessingPolling() {
+            if (processingInterval) clearInterval(processingInterval);
+            pollProcessingStatus();
+            processingInterval = setInterval(pollProcessingStatus, 2000);
+        }
+
+        async function pollProcessingStatus() {
+            try {
+                const response = await fetch(`/api/assignments/${assignmentId}/documents/status`);
+                const documents = await response.json();
+
+                updateProcessingUI(documents);
+
+                const allFinished = documents.every(d =>
+                    d.status === 'completed' || d.status === 'failed'
+                );
+
+                if (allFinished && documents.length > 0) {
+                    clearInterval(processingInterval);
+                    document.getElementById('processingCloseBtn').disabled = false;
+                    document.getElementById('processingStatusText').textContent = 'Processing Complete';
+                }
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+        }
+
+        function updateProcessingUI(documents) {
+            let totalProgress = 0;
+            let html = '';
+
+            // Only show documents relevant to this session/batch? 
+            // Ideally we only show documents uploaded recently or processing.
+            // But API returns all relevant documents.
+            // We can filter by status != 'completed' OR recently uploaded.
+            // For simplicity, let's show all processing/queued and recent completed.
+            // Or just show all. Showing all allows checking old status too.
+            // Let's show all but sort processing first.
+
+            const processingDocs = documents.filter(d => d.status === 'processing' || d.status === 'queued');
+            const otherDocs = documents.filter(d => d.status !== 'processing' && d.status !== 'queued');
+
+            const displayDocs = [...processingDocs, ...otherDocs];
+
+            documents.forEach(doc => {
+                totalProgress += (doc.progress || 0);
+            });
+
+            displayDocs.forEach(doc => {
+                const progress = doc.progress || 0;
+                let statusClass = 'queued';
+                if (doc.status === 'processing') statusClass = 'processing';
+                if (doc.status === 'completed') statusClass = 'completed';
+                if (doc.status === 'failed') statusClass = 'failed';
+
+                html += `
+                    <div class="processing-item ${statusClass}">
+                        <span>${doc.filename}</span>
+                        <span>
+                            ${doc.status} 
+                            ${doc.status === 'completed' ? `(${doc.chunk_count} chunks)` : ''}
+                            ${doc.status === 'failed' ? `(${doc.error_message})` : ''}
+                            ${doc.status === 'processing' ? Math.round(progress) + '%' : ''}
+                        </span>
+                    </div>
+                `;
+            });
+
+            const avgProgress = documents.length ? (totalProgress / documents.length) : 0;
+            const bar = document.getElementById('processingProgressBar');
+            bar.style.width = `${avgProgress}%`;
+            bar.textContent = `${Math.round(avgProgress)}%`;
+
+            document.getElementById('processingDetails').innerHTML = html;
+
+            if (processingDocs.length > 0) {
+                document.getElementById('processingStatusText').textContent = `Processing ${processingDocs.length} document(s)...`;
+            }
+        }
 
         // Modal close on outside click
         globalThis.onclick = function (event) {

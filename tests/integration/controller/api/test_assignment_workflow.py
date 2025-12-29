@@ -74,10 +74,10 @@ class TestAssignmentWorkflow:
         doc_content = b"Test document content"
         response = self.client.post(
             f"/assignments/{assignment_id}/documents",
-            files={"file": ("doc.txt", io.BytesIO(doc_content), "text/plain")},
+            files=[("files", ("doc.txt", io.BytesIO(doc_content), "text/plain"))],
         )
         assert response.status_code == status.HTTP_200_OK
-        doc_id = response.json()["id"]
+        doc_id = response.json()["files"][0]["id"]
 
         response = self.client.get(f"/assignments/{assignment_id}")
         assert response.status_code == status.HTTP_200_OK
@@ -204,4 +204,3 @@ class TestAssignmentWorkflow:
         fake_id = "60c72b2f9b1d8e2a1c9d4b7f"
         response = self.client.patch(f"/rubrics/{fake_id}", json={"title": "New Title"})
         assert response.status_code == status.HTTP_404_NOT_FOUND
-

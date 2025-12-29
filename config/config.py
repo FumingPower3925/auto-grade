@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from config.models import DatabaseConfig, LLMConfig, OCRConfig, ServerConfig
+from config.models import DatabaseConfig, EmbeddingConfig, LLMConfig, OCRConfig, ServerConfig
 
 
 class Config(BaseModel):
@@ -12,6 +12,7 @@ class Config(BaseModel):
     llm: LLMConfig = LLMConfig()
     database: DatabaseConfig = DatabaseConfig()
     ocr: OCRConfig = OCRConfig()
+    embedding: EmbeddingConfig = EmbeddingConfig()
 
     def __init__(self) -> None:
         toml_config = self._load_toml_config()

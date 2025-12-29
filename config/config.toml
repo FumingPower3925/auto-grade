@@ -13,8 +13,15 @@ provider = "mistral"
 model = "mistral-ocr-latest"
 base_url = "https://api.mistral.ai/v1"
 
+[embedding]
+provider = "openai"
+model = "text-embedding-3-small"
+dimensions = 1536
+
 [database]
 type = "ferretdb"
 host = "ferretdb"
 port = 27017
 name = "autograde"
+username = "autograde"
+password = "autograde"
